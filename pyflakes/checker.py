@@ -13,6 +13,8 @@ PY32 = sys.version_info < (3, 3)    # Python 2.5 to 3.2
 PY33 = sys.version_info < (3, 4)    # Python 2.5 to 3.3
 builtin_vars = dir(__import__('__builtin__' if PY2 else 'builtins'))
 
+sys.setrecursionlimit(2500)
+
 try:
     import ast
 except ImportError:     # Python 2.5
@@ -385,6 +387,13 @@ class Checker(object):
             if not hasattr(node, 'elts') and not hasattr(node, 'ctx'):
                 return node
 
+    def getFunction(self, node):
+        # Lookup the function node
+        while hasattr(node, 'parent'):
+            node = node.parent
+            if isinstance(node, ast.FunctionDef):
+                return node
+
     def getCommonAncestor(self, lnode, rnode, stop):
         if stop in (lnode, rnode) or not (hasattr(lnode, 'parent') and
                                           hasattr(rnode, 'parent')):
@@ -496,6 +505,16 @@ class Checker(object):
         if name == '__path__' and os.path.basename(self.filename) == '__init__.py':
             # the special name __path__ is valid only in packages
             return
+
+        if isinstance(self.scope, FunctionScope):
+            function = self.getFunction(node)
+            if function:
+                outer_scope = [
+                    scope for scope in self.scopeStack[:-1]
+                    if isinstance(scope, (FunctionScope, ClassScope, ModuleScope, GeneratorScope))][-1]
+                if function.name not in outer_scope:
+                    print('here', name, function.name, outer_scope)
+                    return
 
         # protected with a NameError handler?
         if 'NameError' not in self.exceptHandlers[-1]:

@@ -139,6 +139,14 @@ class Test(TestCase):
         a
         ''')
 
+    def test_multi_del_global(self):
+        """Del multiple dependant functions."""
+        self.flakes('''
+        def a(): pass
+        def b(): a()
+        del a, b
+        ''')
+
     def test_delUndefined(self):
         """Del an undefined name."""
         self.flakes('del a', m.UndefinedName)
