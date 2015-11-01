@@ -129,6 +129,10 @@ class Test(TestCase):
         """Del deletes bindings."""
         self.flakes('a = 1; del a; a', m.UndefinedName)
 
+    # def test_del_func(self):
+    #     """Del deletes bindings."""
+    #     self.flakes('def f(): return 1; del f; f()', m.UndefinedName)  # recursion
+
     def test_delGlobal(self):
         """Del a global binding from a function."""
         self.flakes('''
@@ -210,6 +214,66 @@ class Test(TestCase):
                         del o
                 o = False
         ''')
+
+    def test_multiple_interdependent_del_global_simple(self):
+        """Del multiple dependant functions."""
+        self.flakes('''
+        def a(): return '1'
+        def b(): a()
+        b()
+        c = b
+        del b, a
+        ''')
+
+    def test_multiple_interdependent_del_global_group(self):
+        """Del multiple dependant functions."""
+        self.flakes('''
+        def a(): return '1'
+        def b(): a()
+        b()
+        c = b
+        del a, b
+        ''')
+
+    def test_multiple_interdependent_del_class(self):
+        """Del multiple dependant functions."""
+        self.flakes('''
+            def meth():
+                return 'foo'
+
+            class test():
+                def bar():
+                    return meth()
+                baz = bar()
+                del bar
+
+            del meth
+        ''')
+
+    def test_multiple_interdependent_del_vars_not_needed(self):
+        """Del multiple dependant vars."""
+        self.flakes('''
+        a = '1'
+        b = '2'
+        c = b
+
+        del a, b
+        ''')
+
+    def test_multiple_interdependent_del_vars_inner_func(self):
+        """Del multiple dependant functions."""
+        self.flakes('''
+        def foo():
+            def bar():
+                return 'a'
+            def baz():
+                r = 'r'
+                return bar() + r
+            b = baz()
+            del bar
+            return b
+        ''')
+        # < 3.2 : SyntaxError: can not delete variable 'bar' referenced in nested scope
 
     def test_globalFromNestedScope(self):
         """Global names are available from nested scopes."""

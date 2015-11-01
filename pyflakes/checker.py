@@ -13,6 +13,8 @@ PY32 = sys.version_info < (3, 3)    # Python 2.5 to 3.2
 PY33 = sys.version_info < (3, 4)    # Python 2.5 to 3.3
 builtin_vars = dir(__import__('__builtin__' if PY2 else 'builtins'))
 
+sys.setrecursionlimit(2500)
+
 try:
     import ast
 except ImportError:     # Python 2.5
@@ -292,7 +294,7 @@ class Checker(object):
         self.futuresAllowed = True
         self.root = tree
         self.handleChildren(tree)
-        self.runDeferred(self._deferredFunctions)
+        self.runDeferredFunctions()
         # Set _deferredFunctions to None so that deferFunction will fail
         # noisily if called after we've run through the deferred functions.
         self._deferredFunctions = None
@@ -304,7 +306,7 @@ class Checker(object):
         self.popScope()
         self.checkDeadScopes()
 
-    def deferFunction(self, callable):
+    def deferFunction(self, method, node, args):
         """
         Schedule a function handler to be called just before completion.
 
@@ -313,7 +315,7 @@ class Checker(object):
         `callable` is called, the scope at the time this is called will be
         restored, however it will contain any new bindings added to it.
         """
-        self._deferredFunctions.append((callable, self.scopeStack[:], self.offset))
+        self._deferredFunctions.append((method, node, args, self.scopeStack[:], self.offset))
 
     def deferAssignment(self, callable):
         """
@@ -321,6 +323,15 @@ class Checker(object):
         function handlers.
         """
         self._deferredAssignments.append((callable, self.scopeStack[:], self.offset))
+
+    def runDeferredFunctions(self):
+        """
+        Run the functions.
+        """
+        for method, node, args, scope, offset in self._deferredFunctions:
+            self.scopeStack = scope
+            self.offset = offset
+            method(node, args)
 
     def runDeferred(self, deferred):
         """
@@ -385,6 +396,13 @@ class Checker(object):
             if not hasattr(node, 'elts') and not hasattr(node, 'ctx'):
                 return node
 
+    def getFunction(self, node):
+        # Lookup the function node
+        while hasattr(node, 'parent'):
+            node = node.parent
+            if isinstance(node, ast.FunctionDef):
+                return node
+
     def getCommonAncestor(self, lnode, rnode, stop):
         if stop in (lnode, rnode) or not (hasattr(lnode, 'parent') and
                                           hasattr(rnode, 'parent')):
@@ -422,6 +440,7 @@ class Checker(object):
         - `node` is the statement responsible for the change
         - `value` is the new value, a Binding instance
         """
+        name = getattr(node, 'name', None)
         # assert value.source in (node, node.parent):
         for scope in self.scopeStack[::-1]:
             if value.name in scope:
@@ -466,6 +485,10 @@ class Checker(object):
         name = getNodeName(node)
         if not name:
             return
+
+        if name == 'r':
+            raise RuntimeError
+
         # try local scope
         try:
             self.scope[name].used = (self.scope, node)
@@ -501,10 +524,14 @@ class Checker(object):
         if 'NameError' not in self.exceptHandlers[-1]:
             self.report(messages.UndefinedName, node, name)
 
+        print('node loaded but not recorded', name, node, self.scope)
+        # raise RuntimeError
+
     def handleNodeStore(self, node):
         name = getNodeName(node)
         if not name:
             return
+
         # if the name hasn't already been defined in the current scope
         if isinstance(self.scope, FunctionScope) and name not in self.scope:
             # for each function or module scope above us
@@ -532,6 +559,21 @@ class Checker(object):
             binding = Assignment(name, node)
         self.addBinding(node, binding)
 
+    def handleDeferredFunctionImmediate(self, name):
+        saved_offset = self.offset
+
+        for method, node, args, scope, offset in self._deferredFunctions:
+            if hasattr(node, 'name') and node.name == name:
+                if scope[-1] == self.scope:
+                    self.offset = offset
+                    method(node, args)
+
+        self._deferredFunctions[:] = [
+            (method, this_node, args, scope, offset) for (method, this_node, args, scope, offset) in self._deferredFunctions
+            if this_node != node or scope[-1] != self.scope]
+
+        self.offset = saved_offset
+
     def handleNodeDelete(self, node):
 
         def on_conditional_branch():
@@ -558,6 +600,7 @@ class Checker(object):
             self.scope.globals.remove(name)
         else:
             try:
+                self.handleDeferredFunctionImmediate(name)
                 del self.scope[name]
             except KeyError:
                 self.report(messages.UndefinedName, node, name)
@@ -614,7 +657,7 @@ class Checker(object):
 
     _getDoctestExamples = doctest.DocTestParser().get_examples
 
-    def handleDoctests(self, node):
+    def handleDoctests(self, node, args=None):
         try:
             (docstring, node_lineno) = self.getDocstring(node.body[0])
             examples = docstring and self._getDoctestExamples(docstring)
@@ -762,7 +805,9 @@ class Checker(object):
         self.LAMBDA(node)
         self.addBinding(node, FunctionDefinition(node.name, node))
         if self.withDoctest:
-            self.deferFunction(lambda: self.handleDoctests(node))
+            (docstring, node_lineno) = self.getDocstring(node.body[0])
+            if docstring:
+                self.deferFunction(self.handleDoctests, node, None)
 
     ASYNCFUNCTIONDEF = FUNCTIONDEF
 
@@ -812,40 +857,45 @@ class Checker(object):
             if child:
                 self.handleNode(child, node)
 
-        def runFunction():
+        self.deferFunction(self.handleFunction, node, args)
 
-            self.pushScope()
-            for name in args:
-                self.addBinding(node, Argument(name, node))
-            if isinstance(node.body, list):
-                # case for FunctionDefs
-                for stmt in node.body:
-                    self.handleNode(stmt, node)
-            else:
-                # case for Lambdas
-                self.handleNode(node.body, node)
+    def handleFunction(self, node, args):
 
-            def checkUnusedAssignments():
+        self.pushScope()
+        for name in args:
+            self.addBinding(node, Argument(name, node))
+        if isinstance(node.body, list):
+            # case for FunctionDefs
+            for stmt in node.body:
+                self.handleNode(stmt, node)
+        else:
+            # case for Lambdas
+            self.handleNode(node.body, node)
+
+        def checkUnusedAssignments():
+            """
+            Check to see if any assignments have not been used.
+            """
+            for name, binding in self.scope.unusedAssignments():
+                self.report(messages.UnusedVariable, binding.source, name)
+        self.deferAssignment(checkUnusedAssignments)
+
+        if PY32:
+            def checkReturnWithArgumentInsideGenerator():
                 """
-                Check to see if any assignments have not been used.
+                Check to see if there is any return statement with
+                arguments but the function is a generator.
                 """
-                for name, binding in self.scope.unusedAssignments():
-                    self.report(messages.UnusedVariable, binding.source, name)
-            self.deferAssignment(checkUnusedAssignments)
+                if self.scope.isGenerator and self.scope.returnValue:
+                    self.report(messages.ReturnWithArgsInsideGenerator,
+                                self.scope.returnValue)
+            self.deferAssignment(checkReturnWithArgumentInsideGenerator)
 
-            if PY32:
-                def checkReturnWithArgumentInsideGenerator():
-                    """
-                    Check to see if there is any return statement with
-                    arguments but the function is a generator.
-                    """
-                    if self.scope.isGenerator and self.scope.returnValue:
-                        self.report(messages.ReturnWithArgsInsideGenerator,
-                                    self.scope.returnValue)
-                self.deferAssignment(checkReturnWithArgumentInsideGenerator)
-            self.popScope()
+        #if isinstance(node.body, list):
+        #    for stmt in node.body:
+        #        if isinstance(stmt, ast.FunctionDef):
 
-        self.deferFunction(runFunction)
+        self.popScope()
 
     def CLASSDEF(self, node):
         """
@@ -862,7 +912,7 @@ class Checker(object):
                 self.handleNode(keywordNode, node)
         self.pushScope(ClassScope)
         if self.withDoctest:
-            self.deferFunction(lambda: self.handleDoctests(node))
+            self.deferFunction(self.handleDoctests, node, None)
         for stmt in node.body:
             self.handleNode(stmt, node)
         self.popScope()
