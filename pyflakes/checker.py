@@ -8,6 +8,8 @@ import doctest
 import os
 import sys
 
+from warnings import warn
+
 PY2 = sys.version_info < (3, 0)
 PY32 = sys.version_info < (3, 3)    # Python 2.5 to 3.2
 PY33 = sys.version_info < (3, 4)    # Python 2.5 to 3.3
@@ -141,6 +143,18 @@ class Importation(Definition):
         return isinstance(other, Definition) and self.name == other.name
 
 
+class FutureImportation(Importation):
+    """
+    A binding created by a from `__future__` import statement.
+
+    `__future__` imports are implicitly used.
+    """
+
+    def __init__(self, name, source, scope):
+        super(FutureImportation, self).__init__(name, source)
+        self.used = (scope, source)
+
+
 class Argument(Binding):
     """
     Represents binding a name as an argument.
@@ -237,11 +251,12 @@ class GeneratorScope(Scope):
 
 
 class ModuleScope(Scope):
-    pass
+    """Scope for a module."""
+    _futures_allowed = True
 
 
 class DoctestScope(ModuleScope):
-    pass
+    """Scope for a doctest."""
 
 
 # Globally defined names which are not attributes of the builtins module, or
@@ -293,7 +308,6 @@ class Checker(object):
         self.withDoctest = withDoctest
         self.scopeStack = [ModuleScope()]
         self.exceptHandlers = [()]
-        self.futuresAllowed = True
         self.root = tree
         self.handleChildren(tree)
         self.runDeferred(self._deferredFunctions)
@@ -307,6 +321,20 @@ class Checker(object):
         del self.scopeStack[1:]
         self.popScope()
         self.checkDeadScopes()
+
+    @property
+    def futuresAllowed(self):
+        """Return whether `__future__` are permitted in the module context."""
+        warn('Checker.futuresAllowed is deprecated', DeprecationWarning, 2)
+        if not isinstance(self.scope, ModuleScope):
+            return False
+        return self.scopeStack[0]._futures_allowed
+
+    @futuresAllowed.setter
+    def futuresAllowed(self, value):
+        """Disable permitting `__future__` in the module."""
+        warn('Checker.futuresAllowed is deprecated', DeprecationWarning, 2)
+        self.scopeStack[0]._futures_allowed = value
 
     def deferFunction(self, callable):
         """
@@ -606,9 +634,13 @@ class Checker(object):
             node.col_offset += self.offset[1]
         if self.traceTree:
             print('  ' * self.nodeDepth + node.__class__.__name__)
-        if self.futuresAllowed and not (isinstance(node, ast.ImportFrom) or
-                                        self.isDocstring(node)):
-            self.futuresAllowed = False
+
+        if (isinstance(self.scope, ModuleScope) and
+                self.scope._futures_allowed and
+                not (isinstance(node, ast.ImportFrom) or
+                     self.isDocstring(node))):
+            self.scope._futures_allowed = False
+
         self.nodeDepth += 1
         node.depth = self.nodeDepth
         node.parent = parent
@@ -952,21 +984,27 @@ class Checker(object):
 
     def IMPORTFROM(self, node):
         if node.module == '__future__':
-            if not self.futuresAllowed:
+            # __future__ can only appear in module/doctest scope and
+            # should not have been disabled already in handleNode and
+            # the scope must not have any other type of binding.
+            if (not isinstance(self.scope, ModuleScope) or
+                    not self.scope._futures_allowed or
+                    any(not isinstance(binding, FutureImportation)
+                        for binding in self.scope.values())):
+                self.scope._futures_allowed = False
                 self.report(messages.LateFutureImport,
                             node, [n.name for n in node.names])
-        else:
-            self.futuresAllowed = False
 
         for alias in node.names:
-            if alias.name == '*':
+            name = alias.asname or alias.name
+            if node.module == '__future__':
+                importation = FutureImportation(name, node, self.scope)
+            elif alias.name == '*':
                 self.scope.importStarred = True
                 self.report(messages.ImportStarUsed, node, node.module)
                 continue
-            name = alias.asname or alias.name
-            importation = Importation(name, node)
-            if node.module == '__future__':
-                importation.used = (self.scope, node)
+            else:
+                importation = Importation(name, node)
             self.addBinding(node, importation)
 
     def TRY(self, node):

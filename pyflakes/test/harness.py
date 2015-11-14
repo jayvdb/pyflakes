@@ -19,10 +19,14 @@ PyCF_ONLY_AST = 1024
 class TestCase(unittest.TestCase):
 
     withDoctest = False
+    checker_cls = checker.Checker
 
     def flakes(self, input, *expectedOutputs, **kw):
         tree = compile(textwrap.dedent(input), "<test>", "exec", PyCF_ONLY_AST)
-        w = checker.Checker(tree, withDoctest=self.withDoctest, **kw)
+        if 'withDoctest' not in kw:
+            kw['withDoctest'] = self.withDoctest
+
+        w = self.checker_cls(tree, **kw)
         outputs = [type(o) for o in w.messages]
         expectedOutputs = list(expectedOutputs)
         outputs.sort(key=lambda t: t.__name__)

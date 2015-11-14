@@ -363,16 +363,13 @@ class Test(TestCase):
 
 
 class TestOther(_DoctestMixin, TestOther):
+    """Run TestOther with each test wrapped in a doctest."""
     pass
 
 
 class TestImports(_DoctestMixin, TestImports):
-
-    def test_futureImport(self):
-        """XXX This test can't work in a doctest"""
-
-    def test_futureImportUsed(self):
-        """XXX This test can't work in a doctest"""
+    """Run TestImports with each test wrapped in a doctest."""
+    pass
 
 
 class TestUndefinedNames(_DoctestMixin, TestUndefinedNames):
