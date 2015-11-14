@@ -153,6 +153,15 @@ class Argument(Binding):
     """
 
 
+class DoctestAutoUnderscore(Binding):
+    """
+    Automatic binding to '_' created by doctest.
+    """
+
+    def __init__(self, source):
+        super(DoctestAutoUnderscore, self).__init__('_', source)
+
+
 class Assignment(Binding):
     """
     Represents binding a name with an explicit assignment.
@@ -644,9 +653,6 @@ class Checker(object):
             return
         node_offset = self.offset or (0, 0)
         self.pushScope(DoctestScope)
-        underscore_in_builtins = '_' in self.builtIns
-        if not underscore_in_builtins:
-            self.builtIns.add('_')
         for example in examples:
             try:
                 tree = compile(example.source, "<doctest>", "exec", ast.PyCF_ONLY_AST)
@@ -662,8 +668,9 @@ class Checker(object):
                                node_offset[1] + example.indent + 4)
                 self.handleChildren(tree)
                 self.offset = node_offset
-        if not underscore_in_builtins:
-            self.builtIns.remove('_')
+                if example.want:
+                    node = tree.body[0]
+                    self.addBinding(node, DoctestAutoUnderscore(node))
         self.popScope()
 
     def ignore(self, node):

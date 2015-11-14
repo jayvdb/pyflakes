@@ -10,7 +10,7 @@ from pyflakes.checker import (
 from pyflakes.test.test_other import Test as TestOther
 from pyflakes.test.test_imports import Test as TestImports
 from pyflakes.test.test_undefined_names import Test as TestUndefinedNames
-from pyflakes.test.harness import TestCase, skip
+from pyflakes.test.harness import TestCase, skip, erroneous_result
 
 try:
     sys.pypy_version_info
@@ -28,6 +28,8 @@ class _DoctestMixin(object):
         for line in textwrap.dedent(input).splitlines():
             if line.strip() == '':
                 pass
+            elif line.startswith('# doctest output: '):
+                line = line[18:]
             elif (line.startswith(' ') or
                   line.startswith('except:') or
                   line.startswith('except ') or
@@ -179,6 +181,24 @@ class Test(TestCase):
         self.assertIn('m', function_scopes[1])
 
         self.assertNotIn('m', module_scope)
+
+    @erroneous_result
+    def test_doctest_empty_source_with_want(self):
+        """Empty doctest example source with a want is an error."""
+        # TODO: doctest skips an empty source line, and its wanted result.
+        # Detecting this requires loosely parsing docstrings for empty '>>>'.
+        self.flakes("""
+        def doctest_stuff():
+            '''
+                >>> 1
+                1
+                >>>
+                >>>
+                1
+                >>> 1
+                1
+            '''
+        """, m.Message)
 
     def test_global_undefined(self):
         self.flakes("""
@@ -368,18 +388,77 @@ class Test(TestCase):
         exc = exceptions[1]
         self.assertEqual(exc.lineno, 6)
 
-    def test_singleUnderscoreInDoctest(self):
-        self.flakes('''
-        def func():
-            """A docstring
 
-            >>> func()
-            1
-            >>> _
-            1
-            """
-            return 1
+class TestUnderscore(_DoctestMixin, TestCase):
+
+    withDoctest = True
+
+    def test_underscore_undefined(self):
+        """Underscore does not exist at beginning of scope."""
+        self.flakes('_', m.UndefinedName)
+
+    def test_underscore_after_assignment(self):
+        """Underscore does not exist after assignment."""
+        self.flakes('a = 1\n_', m.UndefinedName)
+
+    def test_underscore_after_definition(self):
+        """Underscore does not exist after a function definition."""
+        self.flakes('''
+        def foo(): pass
+
+        _
+        ''', m.UndefinedName)
+
+    def test_underscore_after_import(self):
+        """Underscore does not exist after an import."""
+        self.flakes('''
+        import foo
+        foo.x
+
+        _
+        ''', m.UndefinedName)
+
+    def test_underscore_after_unbound_value(self):
+        self.flakes('''
+        1
+        # doctest output: 1
+        _
         ''')
+
+    @erroneous_result
+    def test_underscore_after_print_undefined(self):
+        """Underscore does not exist after a print output."""
+        self.flakes('''
+        print(1)
+        # doctest output: 1
+        _
+        ''', m.UndefinedName)
+
+    def test_underscore_nested_inherited(self):
+        """Underscore does inherit outer scope."""
+        self.flakes('''
+        def foo():
+            print(_)
+
+        1
+        # doctest output: 1
+        _
+        # doctest output: 1
+        foo()
+        # doctest output: 1
+        ''')
+
+    @erroneous_result
+    def test_underscore_nested_definition(self):
+        """Underscore used in nested scope before it exists."""
+        self.flakes('''
+        def foo():
+            1
+            print(_)
+
+        foo()
+        # doctest output: 1
+        ''', m.UndefinedName)
 
 
 class TestOther(_DoctestMixin, TestOther):

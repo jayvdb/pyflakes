@@ -5,14 +5,17 @@ import unittest
 
 from pyflakes import checker
 
-__all__ = ['TestCase', 'skip', 'skipIf']
+__all__ = ['TestCase', 'skip', 'skipIf', 'erroneous_result']
 
 if sys.version_info < (2, 7):
     skip = lambda why: (lambda func: 'skip')  # not callable
     skipIf = lambda cond, why: (skip(why) if cond else lambda func: func)
+    erroneous_result = skip('')
 else:
     skip = unittest.skip
     skipIf = unittest.skipIf
+    erroneous_result = unittest.expectedFailure
+
 PyCF_ONLY_AST = 1024
 
 
