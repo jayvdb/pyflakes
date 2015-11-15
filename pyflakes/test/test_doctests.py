@@ -9,7 +9,7 @@ from pyflakes.checker import (
 from pyflakes.test.test_other import Test as TestOther
 from pyflakes.test.test_imports import Test as TestImports
 from pyflakes.test.test_undefined_names import Test as TestUndefinedNames
-from pyflakes.test.harness import TestCase, skip
+from pyflakes.test.harness import TestCase
 
 
 class _DoctestMixin(object):
@@ -183,6 +183,16 @@ class Test(TestCase):
             '''
         """, m.UndefinedName)
 
+    def test_importAfterDoctest(self):
+        self.flakes("""
+        def doctest_stuff():
+            '''
+                >>> foo
+            '''
+
+        import foo
+        """, m.UnusedImport)
+
     def test_importBeforeDoctest(self):
         self.flakes("""
         import foo
@@ -191,9 +201,8 @@ class Test(TestCase):
             '''
                 >>> foo
             '''
-        """)
+        """, m.UnusedImport)
 
-    @skip("todo")
     def test_importBeforeAndInDoctest(self):
         self.flakes('''
         import foo
@@ -205,7 +214,7 @@ class Test(TestCase):
             """
 
         foo
-        ''', m.RedefinedWhileUnused)
+        ''')
 
     def test_importInDoctestAndAfter(self):
         self.flakes('''
@@ -218,6 +227,41 @@ class Test(TestCase):
         import foo
         foo()
         ''')
+
+    def test_importRedefinedByFor(self):
+        self.flakes('''
+        import fu
+        def doctest_stuff():
+            """
+            >>> for fu in range(2):
+            ...    pass
+            """
+
+        fu.bar()
+        ''', m.ImportShadowedByLoopVar)
+
+    def test_importUnusedRedefinedByFor(self):
+        self.flakes('''
+        import fu
+        def doctest_stuff():
+            """
+            >>> for fu in range(2):
+            ...    pass
+            """
+
+        ''', m.UnusedImport, m.ImportShadowedByLoopVar)
+
+    def test_redefinedInDoctest(self):
+        self.flakes('''
+        from __future__ import with_statement
+        import fu
+
+        def doctest_stuff():
+            """
+                >>> with open('foo') as fu:
+                ...     pass
+            """
+        ''', m.UnusedImport, m.RedefinedWhileUnused)
 
     def test_offsetInDoctests(self):
         exc = self.flakes('''

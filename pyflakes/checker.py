@@ -485,14 +485,16 @@ class Checker(object):
 
         # try enclosing function scopes and global scope
         importStarred = self.scope.importStarred
+        below_doctest = isinstance(self.scope, DoctestScope)
         for scope in reversed(scopes):
             importStarred = importStarred or scope.importStarred
-            try:
-                scope[name].used = (self.scope, node)
-            except KeyError:
-                pass
-            else:
+            if name in scope:
+                if not below_doctest:
+                    scope[name].used = (self.scope, node)
                 return
+
+            if isinstance(scope, DoctestScope):
+                below_doctest = True
 
         # look in the built-ins
         if importStarred or name in self.builtIns:
