@@ -4,6 +4,7 @@ Main module.
 Implement the central Checker class.
 Also, it models the Bindings and Scopes.
 """
+import __future__
 import doctest
 import os
 import sys
@@ -999,6 +1000,9 @@ class Checker(object):
             name = alias.asname or alias.name
             if node.module == '__future__':
                 importation = FutureImportation(name, node, self.scope)
+                if alias.name not in __future__.all_feature_names:
+                    self.report(messages.FutureFeatureNotDefined,
+                                node, alias.name)
             elif alias.name == '*':
                 self.scope.importStarred = True
                 self.report(messages.ImportStarUsed, node, node.module)
