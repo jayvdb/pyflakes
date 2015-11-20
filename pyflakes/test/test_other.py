@@ -1633,6 +1633,95 @@ class TestUnusedAssignment(TestCase):
         baz += bar()
         ''')
 
+    def test_assert_no_message(self):
+        """An assert without a message is not an error."""
+        self.flakes('''
+        a = 1
+        assert a
+        ''')
+
+    def test_assert_with_message(self):
+        """An assert with a message is not an error."""
+        self.flakes('''
+        a = 1
+        assert a, 'x'
+        ''')
+
+    def test_assert_tuple(self):
+        """An assert of a tuple is always True."""
+        self.flakes('''
+        assert (False, 'x')
+        ''', m.AssertTuple)
+
+    def test_assert_bool(self):
+        """An assert of a bool is static."""
+        self.flakes('''
+        assert True
+        assert False
+        ''', m.StaticAssert, m.StaticAssert)
+
+    def test_assert_null(self):
+        """An assert of None is static."""
+        self.flakes('''
+        assert None
+        ''', m.StaticAssert)
+
+    def test_assert_num(self):
+        """An assert of a int or float is static."""
+        self.flakes('''
+        assert 1
+        assert 0
+        assert 1.0
+        assert 0.0
+        ''', m.StaticAssert, m.StaticAssert, m.StaticAssert, m.StaticAssert)
+
+    def test_assert_str(self):
+        """An assert of a str is static."""
+        self.flakes('''
+        assert 'x'
+        assert ''
+        ''', m.StaticAssert, m.StaticAssert)
+
+        self.flakes('''
+        assert u'x'
+        assert r'x'
+        assert b'x'
+        ''', m.StaticAssert, m.StaticAssert, m.StaticAssert)
+
+    def test_assert_list(self):
+        """An assert of a list is static."""
+        self.flakes('''
+        assert ['x']
+        assert []
+        ''', m.StaticAssert, m.StaticAssert)
+
+    def test_assert_dict(self):
+        """An assert of a dict is static."""
+        self.flakes('''
+        assert {1: 1, 2: 2}
+        assert {}
+        ''', m.StaticAssert, m.StaticAssert)
+
+    def test_assert_set_call(self):
+        """An assert of a set is static."""
+        self.flakes('''
+        assert set([1])
+        assert set([])
+        assert set()
+        ''', m.StaticAssert, m.StaticAssert, m.StaticAssert)
+
+        self.flakes('''
+        x = [1]
+        assert set(x)
+        ''')
+
+    @skipIf(version_info < (2, 7), 'new in Python 2.7')
+    def test_assert_set_literal(self):
+        """An assert of a set literal is static."""
+        self.flakes('''
+        assert {1}
+        ''', m.StaticAssert)
+
     @skipIf(version_info < (3, 3), 'new in Python 3.3')
     def test_yieldFromUndefined(self):
         """

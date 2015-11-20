@@ -191,3 +191,17 @@ class TooManyExpressionsInStarredAssignment(Message):
     Too many expressions in an assignment with star-unpacking
     """
     message = 'too many expressions in star-unpacking assignment'
+
+
+class StaticAssert(Message):
+    """
+    Assertion test is a static value.
+    """
+    message = 'assertion is a static value'
+
+
+class AssertTuple(Message):
+    """
+    Assertion test is a tuple, which are always True.
+    """
+    message = 'assertion is always true, perhaps remove parentheses?'

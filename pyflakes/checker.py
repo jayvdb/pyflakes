@@ -90,6 +90,15 @@ def iter_child_nodes(node, omit=None, _fields_order=_FieldsOrder()):
                 yield item
 
 
+def _is_bool(node):
+    return (isinstance(node, ast.Name) and
+            node.id in ['True', 'False'])
+
+
+def _is_null(node):
+    return isinstance(node, ast.Name) and node.id == 'None'
+
+
 class Binding(object):
     """
     Represents the binding of a value to a name.
@@ -671,7 +680,7 @@ class Checker(object):
 
     # "stmt" type nodes
     DELETE = PRINT = FOR = ASYNCFOR = WHILE = IF = WITH = WITHITEM = \
-        ASYNCWITH = ASYNCWITHITEM = RAISE = TRYFINALLY = ASSERT = EXEC = \
+        ASYNCWITH = ASYNCWITHITEM = RAISE = TRYFINALLY = EXEC = \
         EXPR = ASSIGN = handleChildren
 
     PASS = ignore
@@ -696,6 +705,25 @@ class Checker(object):
 
     # additional node types
     COMPREHENSION = KEYWORD = FORMATTEDVALUE = handleChildren
+
+    def ASSERT(self, node):
+        def is_constant(node):
+            if _is_bool(node) or _is_null(node):
+                return True
+            elif isinstance(node, (ast.Num, ast.Str, ast.List, ast.Dict, ast.Set)):
+                return True
+            elif isinstance(node, ast.Call):
+                if node.func.id == 'set':
+                    for child in iter_child_nodes(node, omit='func'):
+                        if not is_constant(child):
+                            return False
+                    return True
+
+        if isinstance(node.test, ast.Tuple):
+            self.report(messages.AssertTuple, node)
+        elif is_constant(node.test):
+            self.report(messages.StaticAssert, node)
+        self.handleChildren(node)
 
     def GLOBAL(self, node):
         """
