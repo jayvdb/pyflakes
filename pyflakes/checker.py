@@ -136,16 +136,62 @@ class Importation(Definition):
     @type fullName: C{str}
     """
 
-    def __init__(self, name, source):
-        self.fullName = name
+    def __init__(self, name, source, full_name=None):
+        # A dot should only appear in the name when it is a submodule import
+        # without an 'as' clause, which is a special type of import where the
+        # root module is implicitly imported, and the submodules are also
+        # imported by Python does not restrict which attributes of the root
+        # module may be used.
+        assert '.' not in name or (
+            name == full_name and source.__class__ == ast.Import)
+
+        self._submodule_import = '.' in name
+        if self._submodule_import:
+            name = name.split('.')[0]
+
+        self.fullName = full_name or name
         self.redefined = []
-        name = name.split('.')[0]
         super(Importation, self).__init__(name, source)
 
     def redefines(self, other):
-        if isinstance(other, Importation):
+        if self._submodule_import and isinstance(other, Importation):
             return self.fullName == other.fullName
-        return isinstance(other, Definition) and self.name == other.name
+
+        return (isinstance(other, (Importation, Definition)) and
+                self.name == other.name)
+
+    def _has_alias(self):
+        """Return whether importation uses as clause."""
+        if self._submodule_import:
+            return False
+        if self.fullName == self.name:
+            return False
+        return not self.fullName.endswith('.' + self.name)
+
+    @property
+    def source_statement(self):
+        """Generate a source statement equivalent to the import."""
+        if isinstance(self.source, ast.Import):
+            if self._has_alias():
+                return 'import %s as %s' % (self.fullName, self.name)
+            else:
+                return 'import %s' % self.fullName
+        else:
+            if self._has_alias():
+                parts = self.fullName.split('.')
+                module = '.'.join(parts[:-1])
+                name = parts[-1]
+                return 'from %s import %s as %s' % (module, name, self.name)
+            else:
+                module = self.fullName[:-len(self.name) - 1]
+                return 'from %s import %s' % (module, self.name)
+
+    def __str__(self):
+        """Return import full name with alias."""
+        if self._has_alias():
+            return self.fullName + ' as ' + self.name
+        else:
+            return self.fullName
 
 
 class StarImportation(Importation):
@@ -157,6 +203,13 @@ class StarImportation(Importation):
         # may not be the module name otherwise it will be deemed imported
         self.name = name + '.*'
         self.fullName = name
+
+    @property
+    def source_statement(self):
+        return 'from ' + self.fullName + ' import *'
+
+    def __str__(self):
+        return self.name
 
 
 class FutureImportation(Importation):
@@ -430,7 +483,7 @@ class Checker(object):
                     used = value.used or value.name in all_names
                     if not used:
                         messg = messages.UnusedImport
-                        self.report(messg, value.source, value.name)
+                        self.report(messg, value.source, str(value))
                     for node in value.redefined:
                         if isinstance(self.getParent(node), ast.For):
                             messg = messages.ImportShadowedByLoopVar
@@ -1039,7 +1092,7 @@ class Checker(object):
     def IMPORT(self, node):
         for alias in node.names:
             name = alias.asname or alias.name
-            importation = Importation(name, node)
+            importation = Importation(name, node, alias.name)
             self.addBinding(node, importation)
 
     def IMPORTFROM(self, node):
@@ -1068,7 +1121,8 @@ class Checker(object):
                 self.report(messages.ImportStarUsed, node, node.module)
                 importation = StarImportation(node.module, node)
             else:
-                importation = Importation(name, node)
+                full_name = node.module + '.' + alias.name
+                importation = Importation(name, node, full_name)
             self.addBinding(node, importation)
 
     def TRY(self, node):

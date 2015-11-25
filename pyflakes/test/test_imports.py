@@ -2,7 +2,71 @@
 from sys import version_info
 
 from pyflakes import messages as m
+from pyflakes.checker import ast, Importation, StarImportation
 from pyflakes.test.harness import TestCase, skip, skipIf
+
+
+class TestImportationObject(TestCase):
+
+    def test_import_basic(self):
+        node = ast.Import()
+        binding = Importation('a', node, 'a')
+        assert binding.source_statement == 'import a'
+        assert str(binding) == 'a'
+
+    def test_import_as(self):
+        node = ast.Import()
+        binding = Importation('c', node, 'a')
+        assert binding.source_statement == 'import a as c'
+        assert str(binding) == 'a as c'
+
+    def test_import_submodule(self):
+        node = ast.Import()
+        binding = Importation('a.b', node, 'a.b')
+        assert binding.source_statement == 'import a.b'
+        assert str(binding) == 'a.b'
+
+    def test_import_submodule_as(self):
+        node = ast.Import()
+        binding = Importation('c', node, 'a.b')
+        assert binding.source_statement == 'import a.b as c'
+        assert str(binding) == 'a.b as c'
+
+    def test_import_submodule_as_source_name(self):
+        node = ast.Import()
+        binding = Importation('a', node, 'a.b')
+        assert binding.source_statement == 'import a.b as a'
+        assert str(binding) == 'a.b as a'
+
+    def test_importfrom_member(self):
+        node = ast.ImportFrom()
+        binding = Importation('b', node, 'a.b')
+        assert binding.source_statement == 'from a import b'
+        assert str(binding) == 'a.b'
+
+    def test_importfrom_submodule_member(self):
+        node = ast.ImportFrom()
+        binding = Importation('c', node, 'a.b.c')
+        assert binding.source_statement == 'from a.b import c'
+        assert str(binding) == 'a.b.c'
+
+    def test_importfrom_member_as(self):
+        node = ast.ImportFrom()
+        binding = Importation('c', node, 'a.b')
+        assert binding.source_statement == 'from a import b as c'
+        assert str(binding) == 'a.b as c'
+
+    def test_importfrom_submodule_member_as(self):
+        node = ast.ImportFrom()
+        binding = Importation('d', node, 'a.b.c')
+        assert binding.source_statement == 'from a.b import c as d'
+        assert str(binding) == 'a.b.c as d'
+
+    def test_importfrom_star(self):
+        node = ast.ImportFrom()
+        binding = StarImportation('a.b', node)
+        assert binding.source_statement == 'from a.b import *'
+        assert str(binding) == 'a.b.*'
 
 
 class Test(TestCase):
@@ -16,6 +80,12 @@ class Test(TestCase):
                     m.RedefinedWhileUnused, m.UnusedImport)
         self.flakes('from moo import fu as FU, bar as FU',
                     m.RedefinedWhileUnused, m.UnusedImport)
+
+    def test_aliasedImportShadowModule(self):
+        """Imported aliases can shadow the source of the import."""
+        self.flakes('from moo import fu as moo; moo')
+        self.flakes('import fu as fu; fu')
+        self.flakes('import fu.bar as fu; fu')
 
     def test_usedImport(self):
         self.flakes('import fu; print(fu)')
@@ -684,6 +754,29 @@ class Test(TestCase):
         import fu.baz
         fu.bar, fu.baz
         ''')
+
+    def test_used_package_with_submodule_import(self):
+        """
+        Usage of package marks submodule imports as used.
+        """
+        self.flakes('''
+        import fu
+        import fu.bar
+        fu.x
+        ''')
+
+    def test_unused_package_with_submodule_import(self):
+        """
+        When a package and its submodule are imported, only report once.
+        """
+        checker = self.flakes('''
+        import fu
+        import fu.bar
+        ''', m.UnusedImport)
+        error = checker.messages[0]
+        assert error.message == '%r imported but unused'
+        assert error.message_args == ('fu.bar', )
+        assert error.lineno == 5 if self.withDoctest else 3
 
     def test_assignRHSFirst(self):
         self.flakes('import fu; fu = fu')
