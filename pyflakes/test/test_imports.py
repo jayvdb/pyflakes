@@ -6,6 +6,7 @@ from pyflakes.checker import (
     FutureImportation,
     Importation,
     ImportationFrom,
+    RelativeImportation,
     StarImportation,
     SubmoduleImportation,
 )
@@ -39,6 +40,26 @@ class TestImportationObject(TestCase):
         binding = Importation('a', None, 'a.b')
         assert binding.source_statement == 'import a.b as a'
         assert str(binding) == 'a.b as a'
+
+    def test_importfrom_relative(self):
+        binding = RelativeImportation('a', None, 1, None, 'a')
+        assert binding.source_statement == 'from . import a'
+        assert str(binding) == '.a'
+
+    def test_importfrom_relative_parent(self):
+        binding = RelativeImportation('a', None, 2, None, 'a')
+        assert binding.source_statement == 'from .. import a'
+        assert str(binding) == '..a'
+
+    def test_importfrom_relative_with_module(self):
+        binding = RelativeImportation('b', None, 2, 'a', 'b')
+        assert binding.source_statement == 'from ..a import b'
+        assert str(binding) == '..a.b'
+
+    def test_importfrom_relative_with_module_as(self):
+        binding = RelativeImportation('c', None, 2, 'a', 'b')
+        assert binding.source_statement == 'from ..a import b as c'
+        assert str(binding) == '..a.b as c'
 
     def test_importfrom_member(self):
         binding = ImportationFrom('b', None, 'a', 'b')
@@ -77,6 +98,17 @@ class Test(TestCase):
         self.flakes('import fu, bar', m.UnusedImport, m.UnusedImport)
         self.flakes('from baz import fu, bar', m.UnusedImport, m.UnusedImport)
 
+    def test_unusedImport_relative(self):
+        self.flakes('from . import fu', m.UnusedImport)
+        self.flakes('from . import fu as baz', m.UnusedImport)
+        self.flakes('from .. import fu', m.UnusedImport)
+        self.flakes('from ... import fu', m.UnusedImport)
+        self.flakes('from .. import fu as baz', m.UnusedImport)
+        self.flakes('from .bar import fu', m.UnusedImport)
+        self.flakes('from ..bar import fu', m.UnusedImport)
+        self.flakes('from ...bar import fu', m.UnusedImport)
+        self.flakes('from ...bar import fu as baz', m.UnusedImport)
+
     def test_aliasedImport(self):
         self.flakes('import fu as FU, bar as FU',
                     m.RedefinedWhileUnused, m.UnusedImport)
@@ -93,6 +125,12 @@ class Test(TestCase):
         self.flakes('import fu; print(fu)')
         self.flakes('from baz import fu; print(fu)')
         self.flakes('import fu; del fu')
+
+    def test_usedImport_relative(self):
+        self.flakes('from . import fu; assert fu')
+        self.flakes('from .bar import fu; assert fu')
+        self.flakes('from .. import fu; assert fu')
+        self.flakes('from ..bar import fu as baz; assert baz')
 
     def test_redefinedWhileUnused(self):
         self.flakes('import fu; fu = 3', m.RedefinedWhileUnused)

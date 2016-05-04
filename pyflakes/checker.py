@@ -195,7 +195,12 @@ class ImportationFrom(Importation):
     def __init__(self, name, source, module, real_name=None):
         self.module = module
         self.real_name = real_name or name
-        full_name = module + '.' + self.real_name
+
+        if module.endswith('.'):
+            full_name = module + self.real_name
+        else:
+            full_name = module + '.' + self.real_name
+
         super(ImportationFrom, self).__init__(name, source, full_name)
 
     def __str__(self):
@@ -213,6 +218,15 @@ class ImportationFrom(Importation):
                                                 self.name)
         else:
             return 'from %s import %s' % (self.module, self.name)
+
+
+class RelativeImportation(ImportationFrom):
+
+    def __init__(self, name, source, level, module=None, real_name=None):
+        self.level = level
+        module = ('.' * level) + (module or '')
+
+        super(RelativeImportation, self).__init__(name, source, module, real_name)
 
 
 class StarImportation(Importation):
@@ -1145,6 +1159,9 @@ class Checker(object):
                 self.scope.importStarred = True
                 self.report(messages.ImportStarUsed, node, node.module)
                 importation = StarImportation(node.module, node)
+            elif node.level:
+                importation = RelativeImportation(name, node, node.level,
+                                                  node.module, alias.name)
             else:
                 importation = ImportationFrom(name, node,
                                               node.module, alias.name)
