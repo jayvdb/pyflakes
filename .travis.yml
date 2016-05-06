@@ -25,10 +25,11 @@ script:
   - python setup.py test -q
   - if [ "$TRAVIS_PYTHON_VERSION" != "nightly" ]; then flake8 pyflakes setup.py; fi
   - if [[ $RUN_PYFLAKES -eq 1 ]]; then sudo apt-get install pv ; fi
-  - if [[ $RUN_PYFLAKES -eq 1 ]]; then python -c "import pyflakes.api; pyflakes.api.checkRecursive('$VIRTUAL_ENV', None);" | pv > pyflakes.log ; fi
+  - if [[ $RUN_PYFLAKES -eq 1 ]]; then python -c "import pyflakes.api; pyflakes.api.checkRecursive('$VIRTUAL_ENV/lib/python*', None);" 2>&1 | pv > pyflakes.log ; fi
+  - if [[ $RUN_PYFLAKES -eq 1 ]]; then tail -100 pyflakes.log; fi
 after_script:
   - if [[ $RUN_PYFLAKES -eq 1 ]]; then
-      echo "pyflakes $VIRTUAL_ENV results" && echo -en 'travis_fold:start:script.1\\r' ;
+      echo "pyflakes $VIRTUAL_ENV/lib/python* results" && echo -en 'travis_fold:start:script.1\\r' ;
       cat pyflakes.out ;
       echo -en 'travis_fold:end:script.1\\r' ;
     fi
