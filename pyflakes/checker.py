@@ -91,6 +91,33 @@ def iter_child_nodes(node, omit=None, _fields_order=_FieldsOrder()):
                 yield item
 
 
+def _iter_child_nodes_flattened(node, omit, _fields_order=_FieldsOrder()):
+    """
+    Yield direct child nodes of *node*, and their children, with a recurse flag.
+
+    The value returned is a tuple containing the node and a boolean recurse flag
+    to indicate whether the node needs to be recursed by the caller because
+    all child nodes can not be processed as a flat list.
+
+    e.g. flag is True for lambda nodes, as its children must be handled by
+    the appropriate node handler.
+    """
+    parents = [node]
+    yield_parents = False
+    while parents:
+        nodes = []
+        for parent in parents:
+            if isinstance(parent, ast.Lambda):
+                yield parent, True
+            else:
+                if yield_parents:
+                    yield parent, False
+                nodes += list(iter_child_nodes(parent, omit, _fields_order))
+
+        parents[:] = nodes
+        yield_parents = True
+
+
 class Binding(object):
     """
     Represents the binding of a value to a name.
@@ -737,6 +764,10 @@ class Checker(object):
         for node in iter_child_nodes(tree, omit=omit):
             self.handleNode(node, tree)
 
+    def handleChildrenFlat(self, tree, omit=None):
+        for node, recurse in _iter_child_nodes_flattened(tree, omit=omit):
+            self.handleNode(node, tree, _recurse=recurse)
+
     def isLiteralTupleUnpacking(self, node):
         if isinstance(node, ast.Assign):
             for child in node.targets + [node.value]:
@@ -766,7 +797,7 @@ class Checker(object):
 
         return (node.s, doctest_lineno)
 
-    def handleNode(self, node, parent):
+    def handleNode(self, node, parent, _recurse=True):
         if node is None:
             return
         if self.offset and getattr(node, 'lineno', None) is not None:
@@ -782,7 +813,8 @@ class Checker(object):
         node.parent = parent
         try:
             handler = self.getNodeHandler(node.__class__)
-            handler(node)
+            if _recurse or handler not in (self.handleChildren, self.handleChildrenFlat):
+                handler(node)
         finally:
             self.nodeDepth -= 1
         if self.traceTree:
@@ -839,8 +871,11 @@ class Checker(object):
 
     PASS = ignore
 
-    # "expr" type nodes
-    BOOLOP = BINOP = UNARYOP = IFEXP = DICT = SET = \
+    # "expr" type nodes where processing order has no effect on scope
+    BOOLOP = BINOP = UNARYOP = handleChildrenFlat
+
+    # "expr" type nodes where the order of nodes is important
+    IFEXP = DICT = SET = \
         COMPARE = CALL = REPR = ATTRIBUTE = SUBSCRIPT = \
         STARRED = NAMECONSTANT = handleChildren
 

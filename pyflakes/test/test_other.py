@@ -2,6 +2,8 @@
 Tests for various Pyflakes behavior.
 """
 
+import sys
+
 from sys import version_info
 
 from pyflakes import messages as m
@@ -1084,6 +1086,40 @@ class Test(TestCase):
         x not in y
         ''')
 
+    def test_flattened(self):
+        """
+        Suppress warning when a defined name is used by a binop.
+        """
+        self.flakes('''
+        w = 5
+        x = 10
+        y = 20
+        z = w + x + y
+        ''')
+
+        self.flakes('''
+        a = 10
+        x = {}
+        y = {}
+        z = x + {a: a} + y
+        ''')
+
+    def test_flattened_with_lambda(self):
+        """
+        Suppress warning when a defined name is used in an expression
+        containing flattened and recursed nodes.
+        """
+        self.flakes('''
+        a = 10
+        b = 10
+        l = True and (lambda x: a) or (lambda x: b)
+        ''')
+        self.flakes('''
+        a = 10
+        l = []
+        l = l + (lambda x: a)
+        ''')
+
     def test_loopControl(self):
         """
         break and continue statements are supported.
@@ -1743,3 +1779,17 @@ class TestAsyncStatements(TestCase):
         def foo(a, b):
             return a @ b
         ''')
+
+
+class TestMaximumRecursion(TestCase):
+
+    def setUp(self):
+        self._recursionlimit = sys.getrecursionlimit()
+
+    def test_flattened(self):
+        sys.setrecursionlimit(100)
+        s = 'x = ' + ' + '.join(str(n) for n in range(100))
+        self.flakes(s)
+
+    def tearDown(self):
+        sys.setrecursionlimit(self._recursionlimit)
