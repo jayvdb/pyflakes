@@ -1,6 +1,7 @@
 """
 Tests for various Pyflakes behavior.
 """
+import sys
 
 from sys import version_info
 
@@ -1808,3 +1809,18 @@ class TestAsyncStatements(TestCase):
         mom = 'mom'
         f'{hi} {mom}'
         ''')
+
+
+class TestMaximumRecursion(TestCase):
+
+    def setUp(self):
+        self._recursionlimit = sys.getrecursionlimit()
+
+    def test_recursion_limit(self):
+        # Using self._recursionlimit * 10 tends to cause CPython to core dump.
+        r = range(self._recursionlimit * 9)
+        s = 'x = ' + ' + '.join(str(n) for n in r)
+        self.flakes(s)
+
+    def tearDown(self):
+        sys.setrecursionlimit(self._recursionlimit)
