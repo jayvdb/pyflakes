@@ -17,4 +17,8 @@ install:
 script:
   - python setup.py test -q
   - if [ "$TRAVIS_PYTHON_VERSION" != "nightly" ]; then flake8 pyflakes setup.py; fi
+  - tox -e check_python_env
+  - tail -100 check_python_env.out
+after_script:
+  - cat check_python_env.out
 sudo: false
