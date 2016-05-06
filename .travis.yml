@@ -10,14 +10,10 @@ python:
   - nightly
   - pypy
   - pypy3
-matrix:
-  include:
-    - python: 3.5
-      env: RUN_PYFLAKES=1
-      addons:
-        apt:
-          packages:
-            - bar
+addons:
+  apt:
+    packages:
+      - bar
 install:
   - pip install flake8==2.1.0 pep8==1.5.6
   - python setup.py install
@@ -26,12 +22,11 @@ install:
 script:
   - python setup.py test -q
   - if [ "$TRAVIS_PYTHON_VERSION" != "nightly" ]; then flake8 pyflakes setup.py; fi
-  - if [[ $RUN_PYFLAKES -eq 1 ]]; then sudo apt-get install pv ; fi
-  - if [[ $RUN_PYFLAKES -eq 1 ]]; then python -c "import pyflakes.api; pyflakes.api.checkRecursive('$VIRTUAL_ENV/lib/python*', None);" 2>&1 | bar > pyflakes.log ; fi
-  - if [[ $RUN_PYFLAKES -eq 1 ]]; then tail -100 pyflakes.log; fi
+  - if [ "$TRAVIS_PYTHON_VERSION" = "3.5" ]; then python -c "import pyflakes.api; pyflakes.api.checkRecursive('$VIRTUAL_ENV/lib/python*', None);" 2>&1 | bar > pyflakes.log ; fi
+  - if [ "$TRAVIS_PYTHON_VERSION" = "3.5" ]; then tail -100 pyflakes.log; fi
 after_script:
-  - if [[ $RUN_PYFLAKES -eq 1 ]]; then
-      echo "pyflakes $VIRTUAL_ENV/lib/python* results" && echo -en 'travis_fold:start:script.1\\r' ;
+  - if [ "$TRAVIS_PYTHON_VERSION" = "3.5" ]; then
+      echo "'pyflakes '"$VIRTUAL_ENV/lib/python*"' results" && echo -en 'travis_fold:start:script.1\\r' ;
       cat pyflakes.out ;
       echo -en 'travis_fold:end:script.1\\r' ;
     fi
