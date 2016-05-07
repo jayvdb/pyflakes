@@ -23,8 +23,9 @@ script:
   - python setup.py test -q
   - if [ "$TRAVIS_PYTHON_VERSION" != "nightly" ]; then flake8 pyflakes setup.py; fi
   - if [ "$TRAVIS_PYTHON_VERSION" = "3.5" ]; then
-      echo "Running 'pyflakes "$VIRTUAL_ENV/lib/python*"'" && echo -en 'travis_fold:start:script.1\\r' ;
-      python -c "import pyflakes.api; pyflakes.api.checkRecursive(['$VIRTUAL_ENV/lib/python*'], None);" 2>&1 | bar > pyflakes.log ;
+      PYTHON_BASE_DIR=$VIRTUAL_ENV/lib/python* ;
+      echo "Running 'pyflakes "$PYTHON_BASE_DIR"'" && echo -en 'travis_fold:start:script.1\\r' ;
+      python -c "import pyflakes.api; pyflakes.api.checkRecursive(['$PYTHON_BASE_DIR'], None);" 2>&1 | bar > pyflakes.log ;
       echo -en 'travis_fold:end:script.1\\r' ;
     fi
   - if [ "$TRAVIS_PYTHON_VERSION" = "3.5" ]; then tail -100 pyflakes.log; fi
