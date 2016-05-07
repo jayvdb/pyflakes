@@ -23,7 +23,7 @@ script:
   - python setup.py test -q
   - if [ "$TRAVIS_PYTHON_VERSION" != "nightly" ]; then flake8 pyflakes setup.py; fi
   - if [ "$TRAVIS_PYTHON_VERSION" = "3.5" ]; then
-      PYTHON_BASE_DIR=$VIRTUAL_ENV/lib/python* ;
+      PYTHON_BASE_DIR=$(realpath $VIRTUAL_ENV/lib/python*) ;
       echo "Running 'pyflakes "$PYTHON_BASE_DIR"'" && echo -en 'travis_fold:start:script.1\\r' ;
       python -c "import pyflakes.api; pyflakes.api.checkRecursive(['$PYTHON_BASE_DIR'], None);" 2>&1 | bar > pyflakes.log ;
       echo -en 'travis_fold:end:script.1\\r' ;
