@@ -91,6 +91,33 @@ def iter_child_nodes(node, omit=None, _fields_order=_FieldsOrder()):
                 yield item
 
 
+def convert_to_value(item):
+    if isinstance(item, ast.Str):
+        return item.s
+    elif hasattr(ast, 'Bytes') and isinstance(item, ast.Bytes):
+        return item.s
+    elif isinstance(item, ast.Tuple):
+        return tuple(convert_to_value(i) for i in item.elts)
+    elif isinstance(item, ast.Num):
+        return item.n
+    elif isinstance(item, ast.Name):
+        result = VariableKey(item=item)
+        constants_lookup = {
+            'True': True,
+            'False': False,
+            'None': None,
+        }
+        return constants_lookup.get(
+            result.name,
+            result,
+        )
+    elif (not PY33) and isinstance(item, ast.NameConstant):
+        # None, True, False are nameconstants in python3, but names in 2
+        return item.value
+    else:
+        return UnhandledKeyType()
+
+
 class Binding(object):
     """
     Represents the binding of a value to a name.
@@ -125,6 +152,31 @@ class Definition(Binding):
     """
     A binding that defines a function or a class.
     """
+
+
+class UnhandledKeyType(object):
+    """
+    A dictionary key of a type that we cannot or do not check for duplicates.
+    """
+
+
+class VariableKey(object):
+    """
+    A dictionary key which is a variable.
+
+    @ivar item: The variable AST object.
+    """
+    def __init__(self, item):
+        self.name = item.id
+
+    def __eq__(self, compare):
+        return (
+            compare.__class__ == self.__class__
+            and compare.name == self.name
+        )
+
+    def __hash__(self):
+        return hash(self.name)
 
 
 class Importation(Definition):
@@ -849,7 +901,7 @@ class Checker(object):
     PASS = ignore
 
     # "expr" type nodes
-    BOOLOP = BINOP = UNARYOP = IFEXP = DICT = SET = \
+    BOOLOP = BINOP = UNARYOP = IFEXP = SET = \
         COMPARE = CALL = REPR = ATTRIBUTE = SUBSCRIPT = \
         STARRED = NAMECONSTANT = handleChildren
 
@@ -869,6 +921,46 @@ class Checker(object):
 
     # additional node types
     COMPREHENSION = KEYWORD = FORMATTEDVALUE = handleChildren
+
+    def DICT(self, node):
+        # Complain if there are duplicate keys with different values
+        # If they have the same value it's not going to cause potentially
+        # unexpected behaviour so we'll not complain.
+        keys = [
+            convert_to_value(key) for key in node.keys
+        ]
+        for key in set(keys):
+            if keys.count(key) <= 1:
+                continue
+
+            candidate_values = []
+            for candidate in range(len(keys)):
+                if key == keys[candidate]:
+                    candidate_values.append(
+                        convert_to_value(node.values[candidate])
+                    )
+
+            # Determine whether we have different values for the repeats
+            # and complain if so
+            if any(candidate_values.count(value) == 1
+                   for value in set(candidate_values)):
+                key_indices = []
+                for index in range(len(keys)):
+                    if keys[index] == key:
+                        key_indices.append(index)
+                for key_index in key_indices:
+                    key_node = node.keys[key_index]
+                    if isinstance(key, VariableKey):
+                        self.report(messages.MultiValueRepeatedKeyVariable,
+                                    key_node,
+                                    key.name)
+                    else:
+                        self.report(
+                            messages.MultiValueRepeatedKeyLiteral,
+                            key_node,
+                            key,
+                        )
+        self.handleChildren(node)
 
     def ASSERT(self, node):
         if isinstance(node.test, ast.Tuple) and node.test.elts != []:
