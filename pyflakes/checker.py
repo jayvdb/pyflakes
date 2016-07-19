@@ -5,6 +5,7 @@ Implement the central Checker class.
 Also, it models the Bindings and Scopes.
 """
 import __future__
+import collections
 import doctest
 import os
 import sys
@@ -929,25 +930,22 @@ class Checker(object):
         keys = [
             convert_to_value(key) for key in node.keys
         ]
-        for key in set(keys):
-            if keys.count(key) <= 1:
-                continue
 
-            candidate_values = []
-            for candidate in range(len(keys)):
-                if key == keys[candidate]:
-                    candidate_values.append(
-                        convert_to_value(node.values[candidate])
-                    )
+        key_counts = collections.Counter(keys)
+        duplicate_keys = [
+            key for key, count in key_counts.items()
+            if count > 1
+        ]
 
-            # Determine whether we have different values for the repeats
-            # and complain if so
-            if any(candidate_values.count(value) == 1
-                   for value in set(candidate_values)):
-                key_indices = []
-                for index in range(len(keys)):
-                    if keys[index] == key:
-                        key_indices.append(index)
+        for key in duplicate_keys:
+            key_indices = [i for i, i_key in enumerate(keys) if i_key == key]
+
+            values = collections.Counter(
+                convert_to_value(node.values[index])
+                for index in key_indices
+            )
+
+            if any(count == 1 for value, count in values.items()):
                 for key_index in key_indices:
                     key_node = node.keys[key_index]
                     if isinstance(key, VariableKey):
