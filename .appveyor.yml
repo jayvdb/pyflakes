@@ -1,6 +1,8 @@
 install:
   - python -m pip install tox
 
+build: off
+
 test_script:
   - python -m tox
   - python -m check_venv,check_python_tests,check_python_env
