@@ -612,7 +612,7 @@ class IntegrationTests(TestCase):
         package_dir = os.path.dirname(pyflakes.__file__)
         return os.path.join(package_dir, '..', 'bin', 'pyflakes')
 
-    def runPyflakes(self, paths, stdin=None):
+    def runPyflakes(self, paths, stdin=None, strip=True):
         """
         Launch a subprocess running C{pyflakes}.
 
@@ -637,6 +637,9 @@ class IntegrationTests(TestCase):
         if sys.version_info >= (3,):
             stdout = stdout.decode('utf-8')
             stderr = stderr.decode('utf-8')
+        if strip:
+            stdout = stdout.strip()
+            stderr = stderr.strip()
         return (stdout, stderr, rv)
 
     def test_goodFile(self):
@@ -658,9 +661,8 @@ class IntegrationTests(TestCase):
         fd.write("import contraband\n".encode('ascii'))
         fd.close()
         d = self.runPyflakes([self.tempfilepath])
-        d = d.strip()
         expected = UnusedImport(self.tempfilepath, Node(1), 'contraband')
-        self.assertEqual(d, expected, '', 1))
+        self.assertEqual(d, ('%s' % expected, '', 1))
 
     def test_errors(self):
         """
@@ -669,9 +671,7 @@ class IntegrationTests(TestCase):
         printed to stderr.
         """
         d = self.runPyflakes([self.tempfilepath])
-        d = d.strip()
-        error_msg = '%s: No such file or directory%s' % (self.tempfilepath,
-                                                         os.linesep)
+        error_msg = '%s: No such file or directory' % self.tempfilepath
         self.assertEqual(d, ('', error_msg, 1))
 
     def test_readFromStdin(self):
@@ -679,9 +679,8 @@ class IntegrationTests(TestCase):
         If no arguments are passed to C{pyflakes} then it reads from stdin.
         """
         d = self.runPyflakes([], stdin='import contraband')
-        d = d.strip()
         expected = UnusedImport('<stdin>', Node(1), 'contraband')
-        self.assertEqual(d, expected, '', 1))
+        self.assertEqual(d, ('%s' % expected, '', 1))
 
 
 class TestMain(IntegrationTests):
@@ -689,11 +688,13 @@ class TestMain(IntegrationTests):
     Tests of the pyflakes main function.
     """
 
-    def runPyflakes(self, paths, stdin=None):
+    def runPyflakes(self, paths, stdin=None, strip=True):
         try:
             with SysStreamCapturing(stdin) as capture:
                 main(args=paths)
         except SystemExit as e:
+            if strip:
+                return (capture.output.strip(), capture.error.strip(), e.code)
             return (capture.output, capture.error, e.code)
         else:
             raise RuntimeError('SystemExit not raised')
