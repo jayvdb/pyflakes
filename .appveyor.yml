@@ -4,5 +4,4 @@ install:
 build: off
 
 test_script:
-  - python -m tox
-  - python -m check_venv,check_python_tests,check_python_env
+  - python -m tox -e flake8,check_venv,check_python_tests,check_python_env
