@@ -658,8 +658,9 @@ class IntegrationTests(TestCase):
         fd.write("import contraband\n".encode('ascii'))
         fd.close()
         d = self.runPyflakes([self.tempfilepath])
+        d = d.strip()
         expected = UnusedImport(self.tempfilepath, Node(1), 'contraband')
-        self.assertEqual(d, ("%s%s" % (expected, os.linesep), '', 1))
+        self.assertEqual(d, expected, '', 1))
 
     def test_errors(self):
         """
@@ -668,6 +669,7 @@ class IntegrationTests(TestCase):
         printed to stderr.
         """
         d = self.runPyflakes([self.tempfilepath])
+        d = d.strip()
         error_msg = '%s: No such file or directory%s' % (self.tempfilepath,
                                                          os.linesep)
         self.assertEqual(d, ('', error_msg, 1))
@@ -677,8 +679,9 @@ class IntegrationTests(TestCase):
         If no arguments are passed to C{pyflakes} then it reads from stdin.
         """
         d = self.runPyflakes([], stdin='import contraband')
+        d = d.strip()
         expected = UnusedImport('<stdin>', Node(1), 'contraband')
-        self.assertEqual(d, ("%s%s" % (expected, os.linesep), '', 1))
+        self.assertEqual(d, expected, '', 1))
 
 
 class TestMain(IntegrationTests):
