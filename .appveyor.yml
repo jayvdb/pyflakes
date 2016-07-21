@@ -6,6 +6,10 @@ install:
 
   - python -m pip install --upgrade virtualenv pip setuptools tox
 
+  - ps: (New-Object Net.WebClient).DownloadFile('https://bitbucket.org/pypy/pypy/downloads/pypy-2.6.1-win32.zip', "$env:appveyor_build_folder\pypy-2.6.1-win32.zip")
+  - ps: 7z x pypy-2.6.1-win32.zip | Out-Null
+  - move pypy-2.6.1-win32 C:\
+
   - ps: (New-Object Net.WebClient).DownloadFile('https://bitbucket.org/pypy/pypy/downloads/pypy2-v5.3.1-win32.zip', "$env:appveyor_build_folder\pypy2-v5.3.1-win32.zip")
   - ps: 7z x pypy2-v5.3.1-win32.zip | Out-Null
   - move pypy2-v5.3.1-win32 C:\
@@ -36,5 +40,6 @@ build: off
 
 test_script:
   - pypy3 setup.py test -q
+  - C:\pypy-2.6.1-win32\pypy setup.py test -q
   - python -m tox
   - python -m tox -e check_venv,check_python_env
