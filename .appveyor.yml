@@ -34,6 +34,8 @@ install:
   - cd setuptools
   - pypy3 bootstrap.py
   - pypy3 setup.py install
+  - C:\pypy-2.6.1-win32\pypy bootstrap.py
+  - C:\pypy-2.6.1-win32\pypy setup.py install
   - cd ..
 
 build: off
