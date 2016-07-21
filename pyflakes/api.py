@@ -127,7 +127,7 @@ def iterSourceCode(paths):
             yield path
 
 
-def checkRecursive(paths, reporter):
+def checkRecursive(paths, reporter=None):
     """
     Recursively check all source files in C{paths}.
 
