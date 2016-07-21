@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import tempfile
 
+from pyflakes.checker import PYPY
 from pyflakes.messages import UnusedImport
 from pyflakes.reporter import Reporter
 from pyflakes.api import (
@@ -70,7 +71,7 @@ class SysStreamCapturing(object):
             return StringIO(buffer, newline=os.linesep)
         except TypeError:
             self._newline = True
-            # Python 2 creates an input only stream when buffer is not None
+            # Python 2 creates an input only stream when called with arg pos 1
             if buffer is None:
                 return StringIO()
             else:

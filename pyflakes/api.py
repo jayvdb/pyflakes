@@ -103,7 +103,12 @@ def checkPath(filename, reporter=None):
         return 1
     except IOError:
         msg = sys.exc_info()[1]
-        reporter.unexpectedError(filename, msg.args[1])
+        msg = msg.args[1]
+        print('msg %r' % msg)
+        if checker.PYPY:
+            msg = msg.rstrip()
+        print('msg %r' % msg)
+        reporter.unexpectedError(filename, msg)
         return 1
     return check(codestr, filename, reporter)
 
