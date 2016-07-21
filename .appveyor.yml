@@ -11,8 +11,10 @@ install:
   - move pypy3-2.4.0-win32 C:\
   - dir C:\pypy2-v5.3.1-win32
   - dir C:\pypy3-2.4.0-win32
+  # pypy3 installer provides 'pypy.exe', not pypy3.exe.
+  - move C:\pypy3-2.4.0-win32\pypy.exe C:\pypy3-2.4.0-win32\pypy3.exe
 
-  - ps: $env:path = "C:\pypy2-v5.3.1-win32;Cpypy3-2.4.0-win32;$env:path"
+  - ps: $env:path = "C:\pypy2-v5.3.1-win32;C:\pypy3-2.4.0-win32;$env:path"
 
 build: off
 
