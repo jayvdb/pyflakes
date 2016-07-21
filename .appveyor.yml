@@ -6,3 +6,4 @@ build: off
 
 test_script:
   - python -m tox
+  - python -m tox -e check_venv,check_python_env
