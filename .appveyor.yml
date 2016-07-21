@@ -37,6 +37,8 @@ install:
   - C:\pypy-2.6.1-win32\pypy bootstrap.py
   - C:\pypy-2.6.1-win32\pypy setup.py install
   - cd ..
+  - C:\pypy2-v5.3.1-win32\pypy -m ensurepip
+  - C:\pypy2-v5.3.1-win32\pypy -m pip install tox
 
 build: off
 
@@ -44,3 +46,5 @@ test_script:
   - python -m tox
   - C:\pypy3-2.4.0-win32\pypy3 setup.py test -q
   - C:\pypy-2.6.1-win32\pypy setup.py test -q
+  - python -m tox -e check_python_env
+  - C:\pypy2-v5.3.1-win32\pypy -m tox -e check_python_env
