@@ -26,7 +26,7 @@ install:
 
   - ps: $env:path = "$env:path;C:\pypy2-v5.3.1-win32;C:\pypy3-2.4.0-win32"
   - ps: (New-Object Net.WebClient).DownloadFile('https://bootstrap.pypa.io/get-pip.py', "$env:appveyor_build_folder\get-pip.py")
-  - pypy3 get-pip.py
+  - pypy3 get-pip.py --no-use-wheel --egg
   - pypy3 -m pip install setuptools
 
 build: off
