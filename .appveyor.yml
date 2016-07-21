@@ -31,7 +31,6 @@ install:
   - pypy3 bootstrap.py
   - pypy3 setup.py install
   - cd ..
-  - pypy3 get-pip.py
 
 build: off
 
