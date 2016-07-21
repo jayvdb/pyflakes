@@ -29,6 +29,8 @@ install:
 build: off
 
 test_script:
+  - pypy3 -m ensurepip
+  - pypy3 -m pip install setuptools
   - pypy3 setup.py test -q
   - python -m tox
   - python -m tox -e check_venv,check_python_env
