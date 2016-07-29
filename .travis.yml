@@ -12,11 +12,7 @@ python:
   - pypy3
   - pypy3.3-5.2-alpha1
 install:
-  - pip install flake8==2.1.0 pep8==1.5.6
-  - python setup.py install
-  - pip list
-  - if [ "$TRAVIS_PYTHON_VERSION" != "nightly" ]; then flake8 --version; fi
+  - pip install tox-travis
 script:
-  - python setup.py test -q
-  - if [ "$TRAVIS_PYTHON_VERSION" != "nightly" ]; then flake8 pyflakes setup.py; fi
+  - tox
 sudo: false
