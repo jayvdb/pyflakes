@@ -13,7 +13,8 @@ python:
   - pypy3.3-5.2-alpha1
 install:
   - pip install -U "pip<8" setuptools
-  - pip install tox tox-travis==0.4
+  - pip install tox==2.1.1
+  - pip install tox-travis
 script:
   - tox
 sudo: false
