@@ -17,6 +17,6 @@ install:
   - pip list
   - if [ "$TRAVIS_PYTHON_VERSION" != "nightly" ]; then flake8 --version; fi
 script:
-  - python setup.py test -q
+  - python setup.py test
   - if [ "$TRAVIS_PYTHON_VERSION" != "nightly" ]; then flake8 pyflakes setup.py; fi
 sudo: false

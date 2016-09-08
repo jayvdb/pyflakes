@@ -1685,6 +1685,14 @@ class TestUnusedAssignment(TestCase):
         print(f'\x7b4*baz\N{RIGHT CURLY BRACKET}')
         ''')
 
+    @skipIf(version_info < (3, 6), 'new in Python 3.6')
+    def test_formatstring(self):
+        self.flakes('''
+        hi = 'hi'
+        mom = 'mom'
+        print(f'{hi} {mom}')
+        ''')
+
 
 class TestAsyncStatements(TestCase):
 
