@@ -483,7 +483,8 @@ class Checker(object):
     del _customBuiltIns
 
     def __init__(self, tree, filename='(none)', builtins=None,
-                 withDoctest='PYFLAKES_DOCTEST' in os.environ):
+                 withDoctest='PYFLAKES_DOCTEST' in os.environ,
+                 scope=ModuleScope):
         self._nodeHandlers = {}
         self._deferredFunctions = []
         self._deferredAssignments = []
@@ -493,7 +494,7 @@ class Checker(object):
         if builtins:
             self.builtIns = self.builtIns.union(builtins)
         self.withDoctest = withDoctest
-        self.scopeStack = [ModuleScope()]
+        self.scopeStack = [scope()]
         self.exceptHandlers = [()]
         self.root = tree
         self.handleChildren(tree)
@@ -1225,8 +1226,11 @@ class Checker(object):
         def runFunction():
 
             self.pushScope()
-            for name in args:
-                self.addBinding(node, Argument(name, node))
+            if PY2:
+                for name in args:
+                    self.addBinding(node, Argument(name, node))
+            else:
+                self.handleNode(node.args, node)
             if isinstance(node.body, list):
                 # case for FunctionDefs
                 for stmt in node.body:
@@ -1256,6 +1260,17 @@ class Checker(object):
             self.popScope()
 
         self.deferFunction(runFunction)
+
+    def ARGUMENTS(self, node):
+        for arg in node.args:
+            self.handleNode(arg, node)
+        for arg in node.kwonlyargs:
+            self.handleNode(arg, node)
+        self.handleNode(node.vararg, node)
+        self.handleNode(node.kwarg, node)
+
+    def ARG(self, node):
+        self.addBinding(node, Argument(node.arg, node))
 
     def CLASSDEF(self, node):
         """
