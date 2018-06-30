@@ -33,6 +33,14 @@ class RedefinedWhileUnused(Message):
         self.message_args = (name, orig_loc.lineno)
 
 
+class RedefinedBuiltin(Message):
+    message = 'redefinition of builtin %r'
+
+    def __init__(self, filename, loc, name):
+        Message.__init__(self, filename, loc)
+        self.message_args = (name,)
+
+
 class RedefinedInListComp(Message):
     message = 'list comprehension redefines %r from line %r'
 

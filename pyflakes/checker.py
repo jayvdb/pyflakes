@@ -340,6 +340,13 @@ class FutureImportation(ImportationFrom):
         self.used = (scope, source)
 
 
+class Builtin(Definition):
+    """A definition created for all python builtins"""
+
+    def __init__(self, name):
+        super(Builtin, self).__init__(name, None)
+
+
 class Argument(Binding):
     """
     Represents binding a name as an argument.
@@ -494,6 +501,8 @@ class Checker(object):
         self.scopeStack = [ModuleScope()]
         self.exceptHandlers = [()]
         self.root = tree
+        for builtin in self.builtIns:
+            self.addBinding(None, Builtin(builtin))
         self.handleChildren(tree)
         self.runDeferred(self._deferredFunctions)
         # Set _deferredFunctions to None so that deferFunction will fail
@@ -652,6 +661,33 @@ class Checker(object):
                     return True
         return False
 
+    def check_for_module_guards(self, node):
+        """
+        Checks if a node is present inside a guard
+        i.e If, Else, Try block and the guard is
+        at module scope
+        """
+
+        parent = node.parent
+        is_enclosed = False
+
+        if isinstance(parent, ast.Assign):
+            parent = parent.parent
+        if isinstance(parent, ast.ExceptHandler):
+            parent = parent.parent
+        if not PY2:
+            if isinstance(parent, (ast.If, ast.Try)):
+                is_enclosed = True
+        else:
+            if (isinstance(parent, ast.TryExcept) and
+                    isinstance(parent.parent, ast.TryFinally)):
+                parent = parent.parent
+                is_enclosed = True
+            elif isinstance(parent, (ast.If, ast.TryExcept)):
+                is_enclosed = True
+
+        return getattr(parent, 'parent', None) == self.root and is_enclosed
+
     def addBinding(self, node, value):
         """
         Called when a binding is altered.
@@ -665,7 +701,12 @@ class Checker(object):
                 break
         existing = scope.get(value.name)
 
-        if existing and not self.differentForks(node, existing.source):
+        if existing and value.name != '_' and value.name in self.builtIns:
+            if not self.check_for_module_guards(node):
+                self.report(messages.RedefinedBuiltin,
+                            node, value.name)
+
+        elif existing and not self.differentForks(node, existing.source):
 
             parent_stmt = self.getParent(value.source)
             if isinstance(existing, Importation) and isinstance(parent_stmt, ast.For):

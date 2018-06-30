@@ -1993,3 +1993,63 @@ class TestAsyncStatements(TestCase):
         self.flakes('''
         raise NotImplemented
         ''', m.RaiseNotImplemented)
+
+    
+class TestBuiltins(TestCase):
+
+    def test_builtin_redefinition(self):
+        self.flakes('''
+        range = 10
+        ''', m.RedefinedBuiltin)
+
+        self.flakes('''
+        def min():
+            pass
+        ''', m.RedefinedBuiltin)
+
+        self.flakes('''
+        def foo(list):
+            pass
+        ''', m.RedefinedBuiltin)
+
+        self.flakes('''
+        class max:
+            pass
+        ''', m.RedefinedBuiltin)
+
+        self.flakes('''
+        __file__ = 10
+        ''', m.RedefinedBuiltin)
+
+    def test_missing_builtin(self):
+        """
+        Don't warn when redefinition is at module level
+        wrapped inside Try/If block
+        """
+        self.flakes('''
+        try:
+            xrange
+        except NameError:
+            def xrange(start, end):
+                for i in range(start, end):
+                    yield i
+        ''')
+
+        self.flakes('''
+        if 'xrange' not in __builtins__.__dict__:
+            def xrange(start, end):
+                for i in range(start, end):
+                    yield i
+        ''')
+
+        # Not at module level should return error
+        self.flakes('''
+        def foo():
+            if 'max' not in __builtins__.__dict__:
+                def max(a, b):
+                    if a >= b:
+                        return a
+                    else:
+                        return b
+        ''', m.RedefinedBuiltin)
+
