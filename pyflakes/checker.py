@@ -701,12 +701,10 @@ class Checker(object):
                 break
         existing = scope.get(value.name)
 
-        if existing and value.name != '_' and value.name in self.builtIns:
-            if not self.check_for_module_guards(node):
+        if existing and not self.differentForks(node, existing.source):
+            if value.name != '_' and value.name in self.builtIns:
                 self.report(messages.RedefinedBuiltin,
                             node, value.name)
-
-        elif existing and not self.differentForks(node, existing.source):
 
             parent_stmt = self.getParent(value.source)
             if isinstance(existing, Importation) and isinstance(parent_stmt, ast.For):
@@ -719,7 +717,7 @@ class Checker(object):
                                        (ast.For, ast.comprehension))):
                     self.report(messages.RedefinedInListComp,
                                 node, value.name, existing.source)
-                elif not existing.used and value.redefines(existing):
+                elif not existing.used and value.redefines(existing) and not isinstance(existing, Builtin):
                     if value.name != '_' or isinstance(existing, Importation):
                         self.report(messages.RedefinedWhileUnused,
                                     node, value.name, existing.source)
