@@ -1994,7 +1994,7 @@ class TestAsyncStatements(TestCase):
         raise NotImplemented
         ''', m.RaiseNotImplemented)
 
-    
+
 class TestBuiltins(TestCase):
 
     def test_builtin_redefinition(self):
@@ -2052,4 +2052,3 @@ class TestBuiltins(TestCase):
                     else:
                         return b
         ''', m.RedefinedBuiltin)
-
