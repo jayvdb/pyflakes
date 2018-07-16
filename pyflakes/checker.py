@@ -1386,18 +1386,16 @@ class Checker(object):
         # to more accurately determine if the name is used in the except:
         # block.
 
-        for scope in self.scopeStack[::-1]:
-            try:
-                binding = scope.pop(node.name)
-            except KeyError:
-                pass
-            else:
-                prev_definition = scope, binding
-                break
-        else:
+        try:
+            prev_definition = self.scope.pop(node.name)
+        except KeyError:
             prev_definition = None
 
         self.handleNodeStore(node)
+
+        # Store a copy of the binding before it can be deleted
+        binding = self.scope[node.name]
+
         self.handleChildren(node)
 
         # See discussion on https://github.com/PyCQA/pyflakes/pull/59
@@ -1409,18 +1407,14 @@ class Checker(object):
         #
         # Unless it's been removed already. Then do nothing.
 
-        try:
-            binding = self.scope.pop(node.name)
-        except KeyError:
-            pass
-        else:
-            if not binding.used:
-                self.report(messages.UnusedVariable, node, node.name)
+        if not binding.used:
+            self.report(messages.UnusedVariable, node, node.name)
 
         # Restore.
         if prev_definition:
-            scope, binding = prev_definition
-            scope[node.name] = binding
+            self.scope[node.name] = prev_definition
+        elif node.name in self.scope:
+            del self.scope[node.name]
 
     def ANNASSIGN(self, node):
         if node.value:

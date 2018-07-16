@@ -102,12 +102,21 @@ class Test(TestCase):
 
     def test_delExceptionInExcept(self):
         """The exception name can be deleted in the except: block."""
+        # The exc variable is unused inside the exception handler.
+        expected = [] if version_info < (3,) else [m.UnusedVariable]
+        self.flakes('''
+        try:
+            pass
+        except Exception as exc:
+            print(exc)
+            del exc
+        ''')
         self.flakes('''
         try:
             pass
         except Exception as exc:
             del exc
-        ''')
+        ''', *expected)
 
     def test_undefinedExceptionNameObscuringLocalVariableFalsePositive2(self):
         """Exception names obscure locals, can't be used after. Unless.
