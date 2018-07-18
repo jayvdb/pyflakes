@@ -405,7 +405,7 @@ class Test(TestCase):
         self.flakes('''
         def test():
             foo = 'bar'
-            while False:
+            while True:
                 del foo
             assert(foo)
         ''')

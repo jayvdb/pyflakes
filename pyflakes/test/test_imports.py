@@ -646,7 +646,7 @@ class Test(TestCase):
     def test_usedInWhile(self):
         self.flakes('''
         import fu
-        while 0:
+        while True:
             fu
         ''')
 
@@ -1180,3 +1180,172 @@ class TestSpecialAll(TestCase):
         class foo:
             pass
         ''', m.UndefinedName)
+
+
+class TestDeadCode(TestCase):
+
+    def test_return(self):
+        self.flakes('''
+        import fu
+        def a():
+            return
+            fu
+
+        def b():
+            c = 1
+            return c
+            fu
+        ''', m.UnusedImport)
+
+        self.flakes('''
+        import fu
+        def a():
+            return fu
+            fu
+        ''')
+
+    def test_raise(self):
+        self.flakes('''
+        import fu
+        def a():
+            raise NameError
+            fu
+        def b():
+            raise
+            fu
+        ''', m.UnusedImport)
+
+        self.flakes('''
+        import fu
+        def a():
+            raise fu
+            fu
+        ''')
+
+    def test_assert_break(self):
+        self.flakes('''
+        import fu
+        while True:
+            break
+            fu
+        ''', m.UnusedImport)
+
+    def test_assert_continue(self):
+        self.flakes('''
+        import fu
+        while True:
+            continue
+            fu
+        ''', m.UnusedImport)
+
+    def test_assert_conditional_break(self):
+        self.flakes('''
+        import fu
+        i = 1
+        while True:
+            if 1 == 2:
+                break
+                fu
+            i = i + 1
+        ''', m.UnusedImport)
+
+    def test_assert_False(self):
+        self.flakes('''
+        import fu
+        def a():
+            assert False
+            fu
+        ''', m.UnusedImport)
+
+        self.flakes('''
+        import fu
+        def a():
+            assert fu
+            fu
+        ''')
+
+    def test_ifFalse(self):
+        self.flakes('''
+        import fu
+        if False:
+            fu
+        if None:
+            fu
+        ''', m.UnusedImport)
+
+    def test_ifElse(self):
+        self.flakes('''
+        import fu
+        if True:
+            pass
+        else:
+            fu
+        ''')
+
+    def test_ifFalseElse(self):
+        self.flakes('''
+        import fu
+        if False:
+            pass
+        else:
+            fu
+        ''')
+
+    def test_ifZero(self):
+        self.flakes('''
+        import fu
+        if 0:
+            fu
+        if 0.0:
+            fu
+        ''', m.UnusedImport)
+
+    def test_ifEmptyString(self):
+        self.flakes('''
+        import fu
+        if '':
+            fu
+        ''', m.UnusedImport)
+
+    def test_forEmptyList(self):
+        self.flakes('''
+        import fu
+        for _ in []:
+           fu
+        for _ in list():
+            fu
+        for _ in list([]):
+            fu
+        ''', m.UnusedImport)
+
+    def test_forEmptyDict(self):
+        self.flakes('''
+        import fu
+        for _ in {}:
+            fu
+        for _ in dict():
+            fu
+        ''', m.UnusedImport)
+
+    def test_forEmptySet(self):
+        self.flakes('''
+        import fu
+        for _ in set():
+           fu
+        ''', m.UnusedImport)
+
+    def test_nested_deadcode(self):
+        self.flakes('''
+        import fu
+        def a():
+            b = 1
+            return b
+            if False:
+                fu
+        if False:
+            def a():
+                def b(): pass
+                return b()
+        def b():
+            return True
+        ''', m.UnusedImport)

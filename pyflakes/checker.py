@@ -6,6 +6,7 @@ Also, it models the Bindings and Scopes.
 """
 import __future__
 import ast
+import builtins
 import doctest
 import os
 import sys
@@ -107,7 +108,7 @@ def iter_child_nodes(node, omit=None, _fields_order=_FieldsOrder()):
                 yield item
 
 
-def convert_to_value(item):
+def convert_to_value(item, hashable=True):
     if isinstance(item, ast.Str):
         return item.s
     elif hasattr(ast, 'Bytes') and isinstance(item, ast.Bytes):
@@ -116,6 +117,12 @@ def convert_to_value(item):
         return tuple(convert_to_value(i) for i in item.elts)
     elif isinstance(item, ast.Num):
         return item.n
+    elif (isinstance(item, ast.Call) and isinstance(item.func, ast.Name)
+            and item.func.id == 'tuple'):
+        if not item.args:
+            return tuple()
+        else:
+            return tuple(convert_to_value(item.args[0], hashable))
     elif isinstance(item, ast.Name):
         result = VariableKey(item=item)
         constants_lookup = {
@@ -130,8 +137,46 @@ def convert_to_value(item):
     elif (not PY2) and isinstance(item, ast.NameConstant):
         # None, True, False are nameconstants in python3, but names in 2
         return item.value
-    else:
-        return UnhandledKeyType()
+    elif not hashable:
+        if isinstance(item, ast.List):
+            return list(convert_to_value(i) for i in item.elts)
+        elif isinstance(item, ast.Dict):
+            return list(convert_to_value(i)
+                        for i in zip(item.keys, item.values))
+
+        elif isinstance(item, ast.Call) and isinstance(item.func, ast.Name):
+            if item.func.id in ('set', 'list', 'dict'):
+                type_ = builtins.__dict__[item.func.id]
+                if not item.args:
+                    return type_()
+                else:
+                    return type_(convert_to_value(item.args[0], hashable))
+
+    return UnhandledKeyType()
+
+
+def node_ignores_children(node):
+    # if isinstance(node, ast.If) and node.test.value in (False, None):
+    if hasattr(node, 'test'):
+        value = convert_to_value(node.test, hashable=False)
+        if not value:
+            return True
+    elif isinstance(node, ast.For):
+        value = convert_to_value(node.iter, hashable=False)
+        if not value:
+            return True
+
+    return False
+
+
+def node_terminates_block(node):
+    if isinstance(node, (ast.Return, ast.Raise, ast.Break, ast.Continue)):
+        return True
+
+    if isinstance(node, ast.Assert):
+        value = convert_to_value(node.test, hashable=False)
+        if not value:
+            return True
 
 
 def is_notimplemented_name_node(node):
@@ -446,6 +491,10 @@ class DoctestScope(ModuleScope):
     """Scope for a doctest."""
 
 
+class DeadCodeScope(Scope):
+    """Scope for a dead code."""
+
+
 # Globally defined names which are not attributes of the builtins module, or
 # are only present on some platforms.
 _MAGIC_GLOBALS = ['__file__', '__builtins__', 'WindowsError']
@@ -704,6 +753,9 @@ class Checker(object):
         return handler
 
     def handleNodeLoad(self, node):
+        if isinstance(self.scope, DeadCodeScope):
+            return
+
         name = getNodeName(node)
         if not name:
             return
@@ -826,8 +878,24 @@ class Checker(object):
                 self.report(messages.UndefinedName, node, name)
 
     def handleChildren(self, tree, omit=None):
+        need_dead_scope = node_ignores_children(tree)
+
         for node in iter_child_nodes(tree, omit=omit):
+            if isinstance(self.scope, DeadCodeScope) and isinstance(tree, ast.If):
+                if tree.orelse and node == tree.orelse[0]:
+                    need_dead_scope = False
+                if not need_dead_scope:
+                    self.popScope()
+            if need_dead_scope and not isinstance(self.scope, DeadCodeScope):
+                self.pushScope(DeadCodeScope)
+
             self.handleNode(node, tree)
+
+            if node_terminates_block(node):
+                need_dead_scope = True
+
+        if need_dead_scope and isinstance(self.scope, DeadCodeScope):
+            self.popScope()
 
     def isLiteralTupleUnpacking(self, node):
         if isinstance(node, ast.Assign):
@@ -1258,7 +1326,7 @@ class Checker(object):
     def ARGUMENTS(self, node):
         for arg in node.args:
             self.handleNode(arg, node)
-        for arg in node.kwonlyargs:
+        for arg in node.__dict__.get('kwonlyargs', []):
             self.handleNode(arg, node)
         self.handleNode(node.vararg, node)
         self.handleNode(node.kwarg, node)
