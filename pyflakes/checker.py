@@ -1162,8 +1162,6 @@ class Checker(object):
     AWAIT = YIELDFROM = YIELD
 
     def FUNCTIONDEF(self, node):
-        for deco in node.decorator_list:
-            self.handleNode(deco, node)
         self.LAMBDA(node)
         self.addBinding(node, FunctionDefinition(node.name, node))
         # doctest does not process doctest within a doctest,
@@ -1178,6 +1176,10 @@ class Checker(object):
     def LAMBDA(self, node):
         args = []
         annotations = []
+
+        if hasattr(node, 'decorator_list'):
+            for deco in node.decorator_list:
+                self.handleNode(deco, node)
 
         if PY2:
             def addArgs(arglist):
@@ -1226,18 +1228,7 @@ class Checker(object):
         def runFunction():
 
             self.pushScope()
-            if PY2:
-                for name in args:
-                    self.addBinding(node, Argument(name, node))
-            else:
-                self.handleNode(node.args, node)
-            if isinstance(node.body, list):
-                # case for FunctionDefs
-                for stmt in node.body:
-                    self.handleNode(stmt, node)
-            else:
-                # case for Lambdas
-                self.handleNode(node.body, node)
+            self.handleChildren(node, omit='decorator_list')
 
             def checkUnusedAssignments():
                 """
