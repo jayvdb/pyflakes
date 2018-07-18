@@ -870,8 +870,9 @@ class Checker(object):
                                         self.isDocstring(node)):
             self.futuresAllowed = False
         self.nodeDepth += 1
-        node.depth = self.nodeDepth
-        node.parent = parent
+        if not isinstance(node, str):
+            node.depth = self.nodeDepth
+            node.parent = parent
         try:
             handler = self.getNodeHandler(node.__class__)
             handler(node)
@@ -1109,6 +1110,8 @@ class Checker(object):
         elif isinstance(node.ctx, ast.Del):
             self.handleNodeDelete(node)
         else:
+            if isinstance(node.ctx, ast.Param):
+                return
             # must be a Param context -- this only happens for names in function
             # arguments, but these aren't dispatched through here
             raise RuntimeError("Got impossible expression context: %r" % (node.ctx,))
