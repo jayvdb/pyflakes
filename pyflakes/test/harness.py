@@ -1,13 +1,16 @@
 
+import sys
 import textwrap
 import unittest
 
 from pyflakes import checker
 
 __all__ = ['TestCase', 'skip', 'skipIf']
-
-skip = unittest.skip
-skipIf = unittest.skipIf
+if sys.version_info < (2, 7):
+    skip = skipIf = (lambda *x: lambda *x: None)
+else:
+    skip = unittest.skip
+    skipIf = unittest.skipIf
 PyCF_ONLY_AST = 1024
 
 

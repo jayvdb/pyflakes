@@ -410,8 +410,11 @@ class FunctionScope(Scope):
     @ivar globals: Names declared 'global' in this function.
     """
     usesLocals = False
-    alwaysUsed = {'__tracebackhide__', '__traceback_info__',
-                  '__traceback_supplement__'}
+    alwaysUsed = set([
+        '__tracebackhide__',
+        '__traceback_info__',
+        '__traceback_supplement__',
+    ])
 
     def __init__(self):
         super(FunctionScope, self).__init__()

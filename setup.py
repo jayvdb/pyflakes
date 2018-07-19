@@ -44,7 +44,7 @@ setup(
     author_email="code-quality@python.org",
     url="https://github.com/PyCQA/pyflakes",
     packages=["pyflakes", "pyflakes.scripts", "pyflakes.test"],
-    python_requires='>=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*',
+    python_requires='>=2.6, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*',
     classifiers=[
         "Development Status :: 6 - Mature",
         "Environment :: Console",
