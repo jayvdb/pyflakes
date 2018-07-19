@@ -6,9 +6,16 @@ Also, it models the Bindings and Scopes.
 """
 import __future__
 import ast
+import collections
 import doctest
+import numbers
 import os
 import sys
+
+try:
+    import builtins
+except ImportError:
+    builtins = __import__('__builtin__')
 
 PY2 = sys.version_info < (3, 0)
 PY34 = sys.version_info < (3, 5)    # Python 2.7 to 3.4
@@ -18,7 +25,8 @@ try:
 except AttributeError:
     PYPY = False
 
-builtin_vars = dir(__import__('__builtin__' if PY2 else 'builtins'))
+builtin_vars = dir(builtins)
+has_bytes = hasattr(ast, 'Bytes')
 
 from pyflakes import messages
 
@@ -80,17 +88,6 @@ class _FieldsOrder(dict):
         return fields
 
 
-def counter(items):
-    """
-    Simplest required implementation of collections.Counter. Required as 2.6
-    does not have Counter in collections.
-    """
-    results = {}
-    for item in items:
-        results[item] = results.get(item, 0) + 1
-    return results
-
-
 def iter_child_nodes(node, omit=None, _fields_order=_FieldsOrder()):
     """
     Yield all direct child nodes of *node*, that is, all fields that
@@ -107,31 +104,113 @@ def iter_child_nodes(node, omit=None, _fields_order=_FieldsOrder()):
                 yield item
 
 
+class VariableKey(object):
+    """
+    A dictionary key which is a variable.
+
+    @ivar item: The variable AST object.
+    """
+
+    def __init__(self, item):
+        self.item = item
+        self.name = item.id
+
+    def __repr__(self):
+        return '%s(Name(%s))' % (self.__class__.__name__, self.name)
+
+    def __str__(self):
+        return self.name
+
+    def __hash__(self):
+        return hash(self.item.id)
+
+    def __eq__(self, compare):
+        if isinstance(compare, ast.Name):
+            return self.name == self.item.id
+
+        return (
+            compare.__class__ == self.__class__
+            and compare.name == self.name
+        )
+
+
 def convert_to_value(item):
+    """
+    Convert to a value if possible using static values and builtins,
+    or return the item.
+    """
     if isinstance(item, ast.Str):
         return item.s
-    elif hasattr(ast, 'Bytes') and isinstance(item, ast.Bytes):
+    elif has_bytes and isinstance(item, ast.Bytes):
         return item.s
-    elif isinstance(item, ast.Tuple):
-        return tuple(convert_to_value(i) for i in item.elts)
     elif isinstance(item, ast.Num):
         return item.n
-    elif isinstance(item, ast.Name):
-        result = VariableKey(item=item)
-        constants_lookup = {
-            'True': True,
-            'False': False,
-            'None': None,
-        }
-        return constants_lookup.get(
-            result.name,
-            result,
-        )
     elif (not PY2) and isinstance(item, ast.NameConstant):
         # None, True, False are nameconstants in python3, but names in 2
         return item.value
-    else:
-        return UnhandledKeyType()
+    elif isinstance(item, ast.Dict):
+        return dict((convert_to_value(key), convert_to_value(value))
+                    for key, value in zip(item.keys, item.values))
+    elif isinstance(item, (ast.Tuple, ast.List, ast.Set)):
+        cls = item.__class__.__name__.lower()
+        type_ = builtins.__dict__.get(cls)
+        return type_(convert_to_value(i) for i in item.elts)
+    elif isinstance(item, ast.Name):
+        if item.id in builtins.__dict__:
+            return builtins.__dict__[item.id]
+
+        return item
+    elif isinstance(item, ast.Call) and isinstance(item.func, ast.Name):
+        name = item.func.id
+        type_ = builtins.__dict__.get(name)
+        if not type_:
+            return item
+
+        try:
+            is_safe = issubclass(type_, (collections.Container, numbers.Number))
+        except (TypeError, AttributeError):
+            is_safe = False
+
+        if not is_safe:
+            if type_ in (abs, all, any, bin, callable, chr, divmod, format, hash,
+                         hex, id, len,
+                         # while unequal, tuple(map(..)) is hashable
+                         map, iter, slice, min, max, oct, ord, pow, repr, range,
+                         reversed, sorted,
+                         round, sum, type, zip,
+                         # 'next' needs a special test
+                         ):
+                is_safe = True
+            elif not PY2 and name in ('ascii',):
+                is_safe = True
+            elif PY2 and name in ('coerce', 'chr', 'hex', 'oct',
+                                  'pow', 'xrange'):
+                is_safe = True
+
+        if not is_safe:
+            return item
+
+        value = None
+        if not item.args:
+            try:
+                value = type_()
+            except Exception:
+                return item
+        else:
+            args = [convert_to_value(arg) for arg in item.args]
+            if not any(isinstance(arg, ast.AST) for arg in args):
+                try:
+                    if type_ == tuple:
+                        value = type_(args)
+                    else:
+                        value = type_(*args)
+                except Exception:
+                    return item
+            else:
+                return item
+        return value
+
+    return item
 
 
 def is_notimplemented_name_node(node):
@@ -172,31 +251,6 @@ class Definition(Binding):
     """
     A binding that defines a function or a class.
     """
-
-
-class UnhandledKeyType(object):
-    """
-    A dictionary key of a type that we cannot or do not check for duplicates.
-    """
-
-
-class VariableKey(object):
-    """
-    A dictionary key which is a variable.
-
-    @ivar item: The variable AST object.
-    """
-    def __init__(self, item):
-        self.name = item.id
-
-    def __eq__(self, compare):
-        return (
-            compare.__class__ == self.__class__
-            and compare.name == self.name
-        )
-
-    def __hash__(self):
-        return hash(self.name)
 
 
 class Importation(Definition):
@@ -1018,7 +1072,29 @@ class Checker(object):
             convert_to_value(key) for key in node.keys
         ]
 
-        key_counts = counter(keys)
+        key_counts = collections.Counter()
+
+        for index, key in enumerate(keys):
+            if isinstance(key, ast.Name):
+                key_counts[VariableKey(key)] += 1
+            elif isinstance(key, ast.AST):
+                pass  # unhandled key type
+            else:
+                try:
+                    hash(key)
+                    hashable = True
+                except TypeError:
+                    hashable = False
+
+                if hashable:
+                    key_counts[key] += 1
+                else:
+                    self.report(
+                        messages.UnhashableTypeError,
+                        node.keys[index],
+                        key.__class__.__name__,
+                    )
+
         duplicate_keys = [
             key for key, count in key_counts.items()
             if count > 1
@@ -1027,7 +1103,7 @@ class Checker(object):
         for key in duplicate_keys:
             key_indices = [i for i, i_key in enumerate(keys) if i_key == key]
 
-            values = counter(
+            values = collections.Counter(
                 convert_to_value(node.values[index])
                 for index in key_indices
             )
@@ -1035,15 +1111,14 @@ class Checker(object):
                 for key_index in key_indices:
                     key_node = node.keys[key_index]
                     if isinstance(key, VariableKey):
-                        self.report(messages.MultiValueRepeatedKeyVariable,
-                                    key_node,
-                                    key.name)
+                        message = messages.MultiValueRepeatedKeyVariable
                     else:
-                        self.report(
-                            messages.MultiValueRepeatedKeyLiteral,
-                            key_node,
-                            key,
-                        )
+                        message = messages.MultiValueRepeatedKeyLiteral
+                    self.report(
+                        message,
+                        key_node,
+                        key,
+                    )
         self.handleChildren(node)
 
     def ASSERT(self, node):

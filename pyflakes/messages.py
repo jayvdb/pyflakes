@@ -132,6 +132,14 @@ class MultiValueRepeatedKeyVariable(Message):
         self.message_args = (key,)
 
 
+class UnhashableTypeError(Message):
+    message = 'dictionary key is unhashable type %r'
+
+    def __init__(self, filename, loc, cls):
+        Message.__init__(self, filename, loc)
+        self.message_args = (cls,)
+
+
 class LateFutureImport(Message):
     message = 'from __future__ imports must occur at the beginning of the file'
 
