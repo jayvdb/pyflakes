@@ -61,6 +61,18 @@ else:
     LOOP_TYPES = (ast.While, ast.For, ast.AsyncFor)
 
 
+def increment_position(node, line_offset=1, col_offset=0):
+    """
+    Adapted from ast.increment_lineno.
+    """
+    for child in ast.walk(node):
+        if 'lineno' in child._attributes:
+            child.lineno = getattr(child, 'lineno', 0) + line_offset
+        if 'col_offset' in child._attributes:
+            child.col_offset = getattr(child, 'col_offset', 0) + col_offset
+    return node
+
+
 class _FieldsOrder(dict):
     """Fix order of AST node fields."""
 
@@ -78,6 +90,18 @@ class _FieldsOrder(dict):
     def __missing__(self, node_class):
         self[node_class] = fields = self._get_fields(node_class)
         return fields
+
+
+class _Examples(ast.AST):
+    """Pseudo node for a set of doctest examples."""
+    _fields = ('body', )
+    _attributes = ('lineno', 'col_offset')
+
+
+class _Example(ast.AST):
+    """Pseudo node for a doctest example."""
+    _fields = ('body', )
+    _attributes = ('lineno', 'col_offset')
 
 
 def counter(items):
@@ -487,10 +511,10 @@ class Checker(object):
         ast.SetComp: GeneratorScope,
         ast.GeneratorExp: GeneratorScope,
         ast.DictComp: GeneratorScope,
+        _Examples: DoctestScope,
     }
 
     nodeDepth = 0
-    offset = None
     traceTree = False
 
     builtIns = set(builtin_vars).union(_MAGIC_GLOBALS)
@@ -538,22 +562,21 @@ class Checker(object):
         `callable` is called, the scope at the time this is called will be
         restored, however it will contain any new bindings added to it.
         """
-        self._deferredFunctions.append((callable, self.scopeStack[:], self.offset))
+        self._deferredFunctions.append((callable, self.scopeStack[:]))
 
     def deferAssignment(self, callable):
         """
         Schedule an assignment handler to be called just after deferred
         function handlers.
         """
-        self._deferredAssignments.append((callable, self.scopeStack[:], self.offset))
+        self._deferredAssignments.append((callable, self.scopeStack[:]))
 
     def runDeferred(self, deferred):
         """
         Run the callables in C{deferred} using their associated scope stack.
         """
-        for handler, scope, offset in deferred:
+        for handler, scope in deferred:
             self.scopeStack = scope
-            self.offset = offset
             handler()
 
     def _in_doctest(self):
@@ -706,16 +729,16 @@ class Checker(object):
                 self.report(messages.ImportShadowedByLoopVar,
                             node, value.name, existing.source)
 
-            elif scope is self.scope:
+            elif scope is self.scope and (
+                    value.name != '_' or isinstance(existing, Importation)):
                 if (isinstance(parent_stmt, ast.comprehension) and
                         not isinstance(self.getParent(existing.source),
                                        (ast.For, ast.comprehension))):
                     self.report(messages.RedefinedInListComp,
                                 node, value.name, existing.source)
                 elif not existing.used and value.redefines(existing):
-                    if value.name != '_' or isinstance(existing, Importation):
-                        self.report(messages.RedefinedWhileUnused,
-                                    node, value.name, existing.source)
+                    self.report(messages.RedefinedWhileUnused,
+                                node, value.name, existing.source)
 
             elif isinstance(existing, Importation) and value.redefines(existing):
                 existing.redefined.append(node)
@@ -894,13 +917,11 @@ class Checker(object):
     def handleNode(self, node, parent):
         if node is None:
             return
-        if self.offset and getattr(node, 'lineno', None) is not None:
-            node.lineno += self.offset[0]
-            node.col_offset += self.offset[1]
         if self.traceTree:
             print('  ' * self.nodeDepth + node.__class__.__name__)
-        if self.futuresAllowed and not (isinstance(node, ast.ImportFrom) or
-                                        self.isDocstring(node)):
+        if (self.futuresAllowed and not (isinstance(node, (ast.ImportFrom,
+                                                           _Example)) or
+                                         self.isDocstring(node))):
             self.futuresAllowed = False
         self.nodeDepth += 1
         node.depth = self.nodeDepth
@@ -915,7 +936,7 @@ class Checker(object):
 
     _getDoctestExamples = doctest.DocTestParser().get_examples
 
-    def handleDoctests(self, node):
+    def createExamplesNode(self, node):
         try:
             if hasattr(node, 'docstring'):
                 docstring = node.docstring
@@ -938,14 +959,11 @@ class Checker(object):
         if not examples:
             return
 
-        # Place doctest in module scope
-        saved_stack = self.scopeStack
-        self.scopeStack = [self.scopeStack[0]]
-        node_offset = self.offset or (0, 0)
-        self.pushScope(DoctestScope)
-        underscore_in_builtins = '_' in self.builtIns
-        if not underscore_in_builtins:
-            self.builtIns.add('_')
+        examples_node = _Examples(
+            parent=node, body=[], depth=node.depth + 1,
+            lineno=node_lineno, col_offset=node.col_offset,
+        )
+
         for example in examples:
             try:
                 tree = compile(example.source, "<doctest>", "exec", ast.PyCF_ONLY_AST)
@@ -957,12 +975,32 @@ class Checker(object):
                             example.indent + 4 + (e.offset or 0))
                 self.report(messages.DoctestSyntaxError, node, position)
             else:
-                self.offset = (node_offset[0] + node_lineno + example.lineno,
-                               node_offset[1] + example.indent + 4)
-                self.handleChildren(tree)
-                self.offset = node_offset
-        if not underscore_in_builtins:
-            self.builtIns.remove('_')
+                example_node = _Example(body=tree.body)
+                increment_position(example_node,
+                                   node_lineno + example.lineno,
+                                   example.indent + 4,
+                                   )
+
+                examples_node.body.append(example_node)
+
+        return examples_node
+
+    def handleDoctests(self, node):
+        # underscore_in_builtins = '_' in self.builtIns
+        # if not underscore_in_builtins:
+        #    self.builtIns.add('_')
+
+        # Place doctest in module scope
+        saved_stack = self.scopeStack
+        self.scopeStack = [self.scopeStack[0]]
+
+        self.pushScope(DoctestScope)
+        self.scope.setdefault('_', Binding('_', node))
+
+        self.handleChildren(node)
+
+        # if not underscore_in_builtins:
+        #    self.builtIns.remove('_')
         self.popScope()
         self.scopeStack = saved_stack
 
@@ -1027,6 +1065,8 @@ class Checker(object):
         BITOR = BITXOR = BITAND = FLOORDIV = INVERT = NOT = UADD = USUB = \
         EQ = NOTEQ = LT = LTE = GT = GTE = IS = ISNOT = IN = NOTIN = \
         MATMULT = ignore
+
+    _EXAMPLES = _EXAMPLE = handleChildren
 
     def RAISE(self, node):
         self.handleChildren(node)
@@ -1203,7 +1243,9 @@ class Checker(object):
         if (self.withDoctest and
                 not self._in_doctest() and
                 not isinstance(self.scope, FunctionScope)):
-            self.deferFunction(lambda: self.handleDoctests(node))
+            examples = self.createExamplesNode(node)
+            if examples:
+                self.deferFunction(lambda: self.handleDoctests(examples))
 
     ASYNCFUNCTIONDEF = FUNCTIONDEF
 
@@ -1314,7 +1356,9 @@ class Checker(object):
         if (self.withDoctest and
                 not self._in_doctest() and
                 not isinstance(self.scope, FunctionScope)):
-            self.deferFunction(lambda: self.handleDoctests(node))
+            examples = self.createExamplesNode(node)
+            if examples:
+                self.deferFunction(lambda: self.handleDoctests(examples))
         for stmt in node.body:
             self.handleNode(stmt, node)
         self.popScope()
