@@ -744,6 +744,9 @@ class Test(TestCase):
             B = dict((i, str(i)) for i in T)
         ''')
 
+    @skipIf(version_info < (2, 7),
+            'in Python < 2.7 which do not have set and dict comprehensions')
+    def test_definedInClassComprehensions(self):
         self.flakes('''
         class A:
             T = range(10)
@@ -776,6 +779,8 @@ class Test(TestCase):
         (42 for i in range(i))
         ''', m.UndefinedName)
 
+    @skipIf(version_info < (2, 7),
+            'in Python < 2.7 which do not have dict comprehensions')
     def test_definedFromLambdaInDictionaryComprehension(self):
         """
         Defined name referenced from a lambda function within a dict/set
@@ -794,6 +799,8 @@ class Test(TestCase):
         any(lambda: id(x) for x in range(10))
         ''')
 
+    @skipIf(version_info < (2, 7),
+            'in Python < 2.7 which do not have dict comprehensions')
     def test_undefinedFromLambdaInDictionaryComprehension(self):
         """
         Undefined name referenced from a lambda function within a dict/set

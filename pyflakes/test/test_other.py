@@ -81,6 +81,8 @@ class Test(TestCase):
         (1 for a, b in [(1, 2)])
         ''')
 
+    @skipIf(version_info < (2, 7),
+            'in Python < 2.7 which do not have set comprehensions')
     def test_redefinedInSetComprehension(self):
         """
         Test that reusing a variable in a set comprehension does not raise
@@ -110,6 +112,8 @@ class Test(TestCase):
         {1 for a, b in [(1, 2)]}
         ''')
 
+    @skipIf(version_info < (2, 7),
+            'in Python < 2.7 which do not have dict comprehensions')
     def test_redefinedInDictComprehension(self):
         """
         Test that reusing a variable in a dict comprehension does not raise
@@ -1591,6 +1595,8 @@ class TestUnusedAssignment(TestCase):
             pass
         ''', m.UndefinedName)
 
+    @skipIf(version_info < (2, 7),
+            'in Python < 2.7 which do not have dict comprehensions')
     def test_dictComprehension(self):
         """
         Dict comprehensions are properly handled.
@@ -1599,6 +1605,8 @@ class TestUnusedAssignment(TestCase):
         a = {1: x for x in range(10)}
         ''')
 
+    @skipIf(version_info < (2, 7),
+            'in Python < 2.7 which do not have dict comprehensions')
     def test_setComprehensionAndLiteral(self):
         """
         Set comprehensions are properly handled.
