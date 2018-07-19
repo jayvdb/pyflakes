@@ -814,6 +814,9 @@ class Checker(object):
         if name == '__module__' and isinstance(self.scope, ClassScope):
             return
 
+        if name == '_' and isinstance(self.scope, DoctestScope):
+            return
+
         # protected with a NameError handler?
         if 'NameError' not in self.exceptHandlers[-1]:
             self.report(messages.UndefinedName, node, name)
@@ -885,6 +888,12 @@ class Checker(object):
         for node in iter_child_nodes(tree, omit=omit):
             self.handleNode(node, tree)
 
+    def handleChildrenInScope(self, tree):
+        scope = self._ast_node_scope[tree.__class__]
+        self.pushScope(scope)
+        self.handleChildren(tree)
+        self.popScope()
+
     def isLiteralTupleUnpacking(self, node):
         if isinstance(node, ast.Assign):
             for child in node.targets + [node.value]:
@@ -897,8 +906,9 @@ class Checker(object):
         Determine if the given node is a docstring, as long as it is at the
         correct place in the node tree.
         """
-        return isinstance(node, ast.Str) or (isinstance(node, ast.Expr) and
-                                             isinstance(node.value, ast.Str))
+        x = isinstance(node, ast.Str) or (isinstance(node, ast.Expr) and
+                                          isinstance(node.value, ast.Str))
+        return x
 
     def getDocstring(self, node):
         if isinstance(node, ast.Expr):
@@ -919,10 +929,11 @@ class Checker(object):
             return
         if self.traceTree:
             print('  ' * self.nodeDepth + node.__class__.__name__)
-        if (self.futuresAllowed and not (isinstance(node, (ast.ImportFrom,
-                                                           _Example)) or
+        if (self.futuresAllowed and not (isinstance(node, ast.ImportFrom) or
+                                         isinstance(parent, _Examples) or
                                          self.isDocstring(node))):
             self.futuresAllowed = False
+
         self.nodeDepth += 1
         node.depth = self.nodeDepth
         node.parent = parent
@@ -975,7 +986,7 @@ class Checker(object):
                             example.indent + 4 + (e.offset or 0))
                 self.report(messages.DoctestSyntaxError, node, position)
             else:
-                example_node = _Example(body=tree.body)
+                example_node = _Example(body=tree.body, parent=examples_node)
                 increment_position(example_node,
                                    node_lineno + example.lineno,
                                    example.indent + 4,
@@ -984,25 +995,6 @@ class Checker(object):
                 examples_node.body.append(example_node)
 
         return examples_node
-
-    def handleDoctests(self, node):
-        # underscore_in_builtins = '_' in self.builtIns
-        # if not underscore_in_builtins:
-        #    self.builtIns.add('_')
-
-        # Place doctest in module scope
-        saved_stack = self.scopeStack
-        self.scopeStack = [self.scopeStack[0]]
-
-        self.pushScope(DoctestScope)
-        self.scope.setdefault('_', Binding('_', node))
-
-        self.handleChildren(node)
-
-        # if not underscore_in_builtins:
-        #    self.builtIns.remove('_')
-        self.popScope()
-        self.scopeStack = saved_stack
 
     def handleAnnotation(self, annotation, node):
         if isinstance(annotation, ast.Str):
@@ -1066,7 +1058,8 @@ class Checker(object):
         EQ = NOTEQ = LT = LTE = GT = GTE = IS = ISNOT = IN = NOTIN = \
         MATMULT = ignore
 
-    _EXAMPLES = _EXAMPLE = handleChildren
+    _EXAMPLES = handleChildrenInScope
+    _EXAMPLE = handleChildren
 
     def RAISE(self, node):
         self.handleChildren(node)
@@ -1157,14 +1150,9 @@ class Checker(object):
 
     NONLOCAL = GLOBAL
 
-    def GENERATOREXP(self, node):
-        self.pushScope(GeneratorScope)
-        self.handleChildren(node)
-        self.popScope()
+    DICTCOMP = SETCOMP = GENERATOREXP = handleChildrenInScope
 
     LISTCOMP = handleChildren if PY2 else GENERATOREXP
-
-    DICTCOMP = SETCOMP = GENERATOREXP
 
     def NAME(self, node):
         """
@@ -1236,6 +1224,7 @@ class Checker(object):
     def FUNCTIONDEF(self, node):
         for deco in node.decorator_list:
             self.handleNode(deco, node)
+
         self.LAMBDA(node)
         self.addBinding(node, FunctionDefinition(node.name, node))
         # doctest does not process doctest within a doctest,
@@ -1245,7 +1234,7 @@ class Checker(object):
                 not isinstance(self.scope, FunctionScope)):
             examples = self.createExamplesNode(node)
             if examples:
-                self.deferFunction(lambda: self.handleDoctests(examples))
+                self.deferFunction(lambda: self.handleNode(examples, node))
 
     ASYNCFUNCTIONDEF = FUNCTIONDEF
 
@@ -1358,7 +1347,7 @@ class Checker(object):
                 not isinstance(self.scope, FunctionScope)):
             examples = self.createExamplesNode(node)
             if examples:
-                self.deferFunction(lambda: self.handleDoctests(examples))
+                self.deferFunction(lambda: self.handleNode(examples, node))
         for stmt in node.body:
             self.handleNode(stmt, node)
         self.popScope()
