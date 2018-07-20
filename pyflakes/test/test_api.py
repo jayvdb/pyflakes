@@ -484,7 +484,7 @@ def foo(bar=baz, bax):
         sourcePath = self.makeTempFile(source)
         last_line = '       ^\n' if ERROR_HAS_LAST_LINE else ''
         column = '8:' if ERROR_HAS_COL_NUM else ''
-        if PYPY and PYPY_VERSION < (5, 10):
+        if PYPY and PYPY_VERSION >= (6, ):
             column = '7:'
 
         self.assertHasErrors(
@@ -506,7 +506,7 @@ foo(bar=baz, bax)
         sourcePath = self.makeTempFile(source)
         last_line = '            ^\n' if ERROR_HAS_LAST_LINE else ''
         column = '13:' if ERROR_HAS_COL_NUM or PYPY else ''
-        if PYPY and PYPY_VERSION < (5, 10):
+        if PYPY and PYPY_VERSION >= (6, ):
             column = '12:'
 
         if sys.version_info >= (3, 5):
