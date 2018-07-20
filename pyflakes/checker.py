@@ -952,7 +952,7 @@ class Checker(object):
                 tree = compile(example.source, "<doctest>", "exec", ast.PyCF_ONLY_AST)
             except SyntaxError:
                 e = sys.exc_info()[1]
-                if PYPY and PYPY_VERSION < (5, 10):
+                if PYPY and PYPY_VERSION < (6, ):
                     e.offset += 1
                 position = (node_lineno + example.lineno + e.lineno,
                             example.indent + 4 + (e.offset or 0))
