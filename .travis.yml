@@ -1,16 +1,8 @@
 language: python
 cache: pip
 python:
-  - 2.7
-  - 3.4
-  - 3.5
-  - 3.6
-  - nightly
-  - pypy
-  - pypy-5.3
-  - pypy3
-  - pypy3.5.2
-  - pypy3.5  # 3.5.3
+  - pypy3.5  # 3.5.3 (PyPy 5.10.1)
+  - pypy3.5-5.8.0
 install:
   - pip install --upgrade .
   - pip list
