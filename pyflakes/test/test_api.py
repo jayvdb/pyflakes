@@ -749,7 +749,11 @@ class IntegrationTests(TestCase):
         fd.close()
         d = self.runPyflakes([self.tempfilepath])
         expected = UnusedImport(self.tempfilepath, Node(1), 'contraband')
-        self.assertEqual(d, ("%s%s" % (expected, os.linesep), '', 1))
+        if PYPY and WIN and PYPY_VERSION >= (5, 10):
+            linesep = '\n'
+        else:
+            linesep = os.linesep
+        self.assertEqual(d, ("%s%s" % (expected, linesep), '', 1))
 
     def test_errors_io(self):
         """
@@ -782,6 +786,7 @@ class IntegrationTests(TestCase):
         else:
             column = 7
             last_line_extra = '  '
+
         error_msg = '{0}:1:{2}: invalid syntax{1}import{1}    {3}^{1}'.format(
             self.tempfilepath, os.linesep, column, last_line_extra)
         self.assertEqual(d, ('', error_msg, True))
@@ -794,7 +799,11 @@ class IntegrationTests(TestCase):
             print(PYPY_VERSION, tuple(PYPY_VERSION))
         d = self.runPyflakes([], stdin='import contraband')
         expected = UnusedImport('<stdin>', Node(1), 'contraband')
-        self.assertEqual(d, ("%s%s" % (expected, os.linesep), '', 1))
+        if PYPY and WIN and PYPY_VERSION >= (5, 10):
+            linesep = '\n'
+        else:
+            linesep = os.linesep
+        self.assertEqual(d, ("%s%s" % (expected, linesep), '', 1))
 
 
 class TestMain(IntegrationTests):
