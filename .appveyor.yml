@@ -5,13 +5,13 @@ install:
   - python -m pip install --upgrade virtualenv pip setuptools tox
 
   # Fetch the three main PyPy releases
-  - ps: (New-Object Net.WebClient).DownloadFile('https://bitbucket.org/pypy/pypy/downloads/pypy-2.6.1-win32.zip', "$env:appveyor_build_folder\pypy-2.6.1-win32.zip")
-  - ps: 7z x pypy-2.6.1-win32.zip | Out-Null
-  - move pypy-2.6.1-win32 C:\
+  # ps: (New-Object Net.WebClient).DownloadFile('https://bitbucket.org/pypy/pypy/downloads/pypy-2.6.1-win32.zip', "$env:appveyor_build_folder\pypy-2.6.1-win32.zip")
+  # ps: 7z x pypy-2.6.1-win32.zip | Out-Null
+  # move pypy-2.6.1-win32 C:\
 
-  - ps: (New-Object Net.WebClient).DownloadFile('https://bitbucket.org/pypy/pypy/downloads/pypy2-v5.3.1-win32.zip', "$env:appveyor_build_folder\pypy2-v5.3.1-win32.zip")
-  - ps: 7z x pypy2-v5.3.1-win32.zip | Out-Null
-  - move pypy2-v5.3.1-win32 C:\
+  # ps: (New-Object Net.WebClient).DownloadFile('https://bitbucket.org/pypy/pypy/downloads/pypy2-v5.3.1-win32.zip', "$env:appveyor_build_folder\pypy2-v5.3.1-win32.zip")
+  # ps: 7z x pypy2-v5.3.1-win32.zip | Out-Null
+  # move pypy2-v5.3.1-win32 C:\
 
   - ps: (New-Object Net.WebClient).DownloadFile('https://bitbucket.org/pypy/pypy/downloads/pypy3-v6.0.0-win32.zip', "$env:appveyor_build_folder\pypy3-v6.0.0-win32.zip")
   - ps: 7z x pypy3-v6.0.0-win32.zip | Out-Null
@@ -32,11 +32,10 @@ install:
   # errors are ignored due to https://github.com/pypa/pip/issues/2669#issuecomment-136405390
   - ps: C:\pypy3-v6.0.0-win32\pypy3 -m ensurepip
   - ps: C:\pypy3-v6.0.0-win32\pypy3 -m pip install -U --force-reinstall pip setuptools; echo "ignore error"
-  - ps: C:\pypy-2.6.1-win32\pypy "$env:appveyor_build_folder\get-pip.py"
+  # ps: C:\pypy-2.6.1-win32\pypy "$env:appveyor_build_folder\get-pip.py"
 
 build: off
 
 test_script:
   - C:\pypy3-v6.0.0-win32\pypy3 setup.py test -q
   - python -m tox
-  - C:\pypy-2.6.1-win32\pypy setup.py test -q
