@@ -790,6 +790,8 @@ class IntegrationTests(TestCase):
         """
         If no arguments are passed to C{pyflakes} then it reads from stdin.
         """
+        if PYPY:
+            print(PYPY_VERSION, tuple(PYPY_VERSION))
         d = self.runPyflakes([], stdin='import contraband')
         expected = UnusedImport('<stdin>', Node(1), 'contraband')
         self.assertEqual(d, ("%s%s" % (expected, os.linesep), '', 1))
