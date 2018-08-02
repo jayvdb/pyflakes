@@ -727,7 +727,7 @@ class IntegrationTests(TestCase):
             if WIN:
                 stderr = stderr.replace('\n', os.linesep)
             # PyPy 6 returns 1 instead of True
-            if rv == 1:
+            elif rv == 1:
                 rv = True
         return (stdout, stderr, rv)
 
