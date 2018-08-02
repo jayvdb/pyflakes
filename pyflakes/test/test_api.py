@@ -420,6 +420,8 @@ def baz():
 
         if PYPY:
             message = 'EOF while scanning triple-quoted string literal'
+            if PYPY_VERSION >= (6, ):
+                message = message.replace('EOF', 'end of file (EOF)')
         else:
             message = 'invalid syntax'
 
@@ -460,8 +462,16 @@ def foo(
         syntax error reflects the cause for the syntax error.
         """
         sourcePath = self.makeTempFile("if True:\n\tfoo =")
-        column = 5 if PYPY else 7
-        last_line = '\t   ^' if PYPY else '\t     ^'
+        if PYPY:
+            if PYPY_VERSION >= (6, ):
+                column = 6
+                last_line = '\t    ^'
+            else:
+                column = 5
+                last_line = '\t   ^'
+        else:
+            column = 7
+            last_line = '\t     ^'
 
         self.assertHasErrors(
             sourcePath,
@@ -484,7 +494,7 @@ def foo(bar=baz, bax):
         sourcePath = self.makeTempFile(source)
         last_line = '       ^\n' if ERROR_HAS_LAST_LINE else ''
         column = '8:' if ERROR_HAS_COL_NUM else ''
-        if PYPY and PYPY_VERSION >= (5, 10):
+        if PYPY and (5, 10) < PYPY_VERSION < (6, ):
             column = '7:'
             last_line = last_line[1:]
 
@@ -507,7 +517,7 @@ foo(bar=baz, bax)
         sourcePath = self.makeTempFile(source)
         last_line = '            ^\n' if ERROR_HAS_LAST_LINE else ''
         column = '13:' if ERROR_HAS_COL_NUM or PYPY else ''
-        if PYPY and PYPY_VERSION >= (5, 10):
+        if PYPY and (5, 10) < PYPY_VERSION < (6, ):
             column = '12:'
             last_line = last_line[1:]
 
@@ -707,6 +717,9 @@ class IntegrationTests(TestCase):
         # Workaround https://bitbucket.org/pypy/pypy/issues/2350
         if PYPY and PY2 and WIN:
             stderr = stderr.replace('\r\r\n', '\r\n')
+        # PyPy 6 returns 1 instead of True
+        if PYPY and PYPY_VERSION >= (6, ) and rv is 1:
+            rv = True
         return (stdout, stderr, rv)
 
     def test_goodFile(self):
@@ -752,8 +765,18 @@ class IntegrationTests(TestCase):
         fd.write("import".encode('ascii'))
         fd.close()
         d = self.runPyflakes([self.tempfilepath])
+        if PYPY:
+            if PYPY_VERSION >= (6, ):
+                column = 6
+                last_line_extra = ' '
+            else:
+                column = 5
+                last_line_extra = ''
+        else:
+            column = 7
+            last_line_extra = '  '
         error_msg = '{0}:1:{2}: invalid syntax{1}import{1}    {3}^{1}'.format(
-            self.tempfilepath, os.linesep, 5 if PYPY else 7, '' if PYPY else '  ')
+            self.tempfilepath, os.linesep, column, last_line_extra)
         self.assertEqual(d, ('', error_msg, True))
 
     def test_readFromStdin(self):
