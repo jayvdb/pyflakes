@@ -53,7 +53,6 @@ def check(codeString, filename, reporter=None):
 
         if checker.PYPY:
             if text is None:
-                print('text was none')
                 lines = codeString.splitlines()
                 if len(lines) >= lineno:
                     text = lines[lineno - 1]
