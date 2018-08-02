@@ -76,8 +76,6 @@ class SysStreamCapturing(object):
         # Python 3 has a newline argument
         try:
             return StringIO(buffer, newline=os.linesep)
-            if PYPY and PYPY_VERSION >= (5, 10):
-                self._newline = True
         except TypeError:
             self._newline = True
             # Python 2 creates an input only stream when buffer is not None
@@ -109,7 +107,7 @@ class SysStreamCapturing(object):
         if self._newline and os.linesep != '\n':
             fix_linesep = True
 
-        if fix_linesep and not (PYPY and PYPY_VERSION >= (5, 10)):
+        if fix_linesep:
             self.output = self.output.replace('\n', os.linesep)
             self.error = self.error.replace('\n', os.linesep)
 
