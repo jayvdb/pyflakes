@@ -63,8 +63,8 @@ def check(codeString, filename, reporter=None):
                             text = None
             offset -= 1
 
-        if checker.PYPY and checker.PYPY_VERSION > (5, 10) and WIN:
-            msg = msg.replace('\n', os.linesep)
+            if text and checker.PYPY_VERSION > (5, 10) and WIN:
+                text = text.replace('\n', os.linesep)
 
         # If there's an encoding problem with the file, the text is None.
         if text is None:
