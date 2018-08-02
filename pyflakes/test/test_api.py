@@ -107,9 +107,9 @@ class SysStreamCapturing(object):
 
         fix_linesep = False
         if self._newline and os.linesep != '\n':
-                fix_linesep = True
+            fix_linesep = True
 
-        if fix_linesep or (PYPY or PYPY_VERSION >= (5, 10)):
+        if fix_linesep and not (PYPY and PYPY_VERSION >= (5, 10)):
             self.output = self.output.replace('\n', os.linesep)
             self.error = self.error.replace('\n', os.linesep)
 
