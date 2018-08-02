@@ -5,13 +5,6 @@ Provide the Reporter class.
 import re
 import sys
 
-try:
-    PYPY_VERSION = sys.pypy_version_info
-    PYPY = True
-except AttributeError:
-    PYPY_VERSION = None
-    PYPY = False
-
 
 class Reporter(object):
     """
@@ -66,10 +59,7 @@ class Reporter(object):
         else:
             self._stderr.write('%s:%d: %s\n' % (filename, lineno, msg))
         self._stderr.write(line)
-        if PYPY and PYPY_VERSION >= (5, 10):
-            self._stderr.write('\r\n')
-        else:
-            self._stderr.write('\n')
+        self._stderr.write('\n')
         if offset is not None:
             self._stderr.write(re.sub(r'\S', ' ', line[:offset]) +
                                "^\n")
@@ -81,10 +71,7 @@ class Reporter(object):
         @param: A L{pyflakes.messages.Message}.
         """
         self._stdout.write(str(message))
-        if PYPY and PYPY_VERSION >= (5, 10):
-            self._stderr.write('\r\n')
-        else:
-            self._stderr.write('\n')
+        self._stdout.write('\n')
 
 
 def _makeDefaultReporter():
