@@ -721,9 +721,12 @@ class IntegrationTests(TestCase):
         # Workaround https://bitbucket.org/pypy/pypy/issues/2350
         if PYPY and PY2 and WIN:
             stderr = stderr.replace('\r\r\n', '\r\n')
-        # PyPy 6 returns 1 instead of True
-        if PYPY and PYPY_VERSION >= (6, ) and rv is 1:
-            rv = True
+        if PYPY and PYPY_VERSION >= (6, ):
+            if WIN:
+                stderr = stderr.replace('\n', os.linesep)
+            # PyPy 6 returns 1 instead of True
+            if rv is 1:
+                rv = True
         return (stdout, stderr, rv)
 
     def test_goodFile(self):
