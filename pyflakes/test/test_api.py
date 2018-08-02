@@ -77,7 +77,7 @@ class SysStreamCapturing(object):
         try:
             return StringIO(buffer, newline=os.linesep)
             if PYPY and PYPY_VERSION >= (5, 10):
-                self._newline = False
+                self._newline = True
         except TypeError:
             self._newline = True
             # Python 2 creates an input only stream when buffer is not None
