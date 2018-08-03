@@ -752,7 +752,9 @@ class IntegrationTests(TestCase):
             linesep = '\r\n'
         else:
             linesep = os.linesep
-        self.assertEqual(d, ("%s%s" % (expected, linesep), '', 1))
+        b = ("%s%s" % (expected, linesep), '', 1)
+        self.assertEqual(d, b,
+                         '%r != %r' % (d, b))
 
     def test_errors_io(self):
         """
