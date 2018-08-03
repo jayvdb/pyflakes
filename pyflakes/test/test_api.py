@@ -749,12 +749,11 @@ class IntegrationTests(TestCase):
         d = self.runPyflakes([self.tempfilepath])
         expected = UnusedImport(self.tempfilepath, Node(1), 'contraband')
         if PYPY and WIN and PYPY_VERSION >= (5, 10):
-            linesep = '\r\n'
+            d = (d[0].rstrip(), d[1], d[2])
+            linesep = ''
         else:
             linesep = os.linesep
-        b = ("%s%s" % (expected, linesep), '', 1)
-        self.assertEqual(d, b,
-                         '%r != %r' % (d, b))
+        self.assertEqual(d, ("%s%s" % (expected, linesep), '', 1))
 
     def test_errors_io(self):
         """
@@ -801,7 +800,8 @@ class IntegrationTests(TestCase):
         d = self.runPyflakes([], stdin='import contraband')
         expected = UnusedImport('<stdin>', Node(1), 'contraband')
         if PYPY and WIN and PYPY_VERSION >= (5, 10):
-            linesep = '\r\n'
+            d = (d[0].rstrip(), d[1], d[2])
+            linesep = ''
         else:
             linesep = os.linesep
         self.assertEqual(d, ("%s%s" % (expected, linesep), '', 1))
