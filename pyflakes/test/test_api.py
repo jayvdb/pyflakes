@@ -761,8 +761,8 @@ class IntegrationTests(TestCase):
 
         # Discard linesep on PyPy 5.10+ but not PyPy 6
         if PYPY and WIN and (5, 10) <= PYPY_VERSION < (6, ):
-            d = (d[0], d[1].rstrip(), d[2])
-            linesep = ''
+            d = (d[0], d[1].replace('\r\n', '\n'), d[2])
+            linesep = '\n'
         else:
             linesep = os.linesep
         error_msg = '%s: No such file or directory%s' % (self.tempfilepath,
@@ -808,8 +808,8 @@ class IntegrationTests(TestCase):
         d = self.runPyflakes([], stdin='import contraband')
         expected = UnusedImport('<stdin>', Node(1), 'contraband')
         if PYPY and WIN and PYPY_VERSION >= (5, 10):
-            d = (d[0].rstrip(), d[1], d[2])
-            linesep = ''
+            d = (d[0].replace('\r\n', '\n'), d[1], d[2])
+            linesep = '\n'
         else:
             linesep = os.linesep
         self.assertEqual(d, ("%s%s" % (expected, linesep), '', 1))
