@@ -185,6 +185,11 @@ class Builtin(Definition):
 
     def __init__(self, name):
         super(Builtin, self).__init__(name, None)
+        self.can_delete = False
+        if not PY2 and name in ['__debug__']:
+            self.can_delete = True
+        elif name in ['__builtins__']:
+            self.can_delete = True
 
     def __repr__(self):
         return '<%s object %r at 0x%x>' % (self.__class__.__name__,
@@ -865,7 +870,9 @@ class Checker(object):
             self.scope.globals.remove(name)
         else:
             binding = self.scope.get(name, None)
-            if not binding or isinstance(binding, Builtin):
+
+            if not binding or (
+                    isinstance(binding, Builtin) and not binding.can_delete):
                 self.report(messages.UndefinedName, node, name)
                 return
 
