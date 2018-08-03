@@ -821,11 +821,7 @@ class TestMain(IntegrationTests):
             with SysStreamCapturing(stdin) as capture:
                 main(args=paths)
         except SystemExit as e:
-            if PYPY and WIN and PYPY_VERSION >= (5, 10):
-                assert isinstance(e.code, bool)
-                rv = int(e.code)
-            else:
-                rv = e.code
+            rv = int(e.code)
             return (capture.output, capture.error, rv)
         else:
             raise RuntimeError('SystemExit not raised')
