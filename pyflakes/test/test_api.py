@@ -103,11 +103,7 @@ class SysStreamCapturing(object):
         self.output = self._stdout_stringio.getvalue()
         self.error = self._stderr_stringio.getvalue()
 
-        fix_linesep = False
         if self._newline and os.linesep != '\n':
-            fix_linesep = True
-
-        if fix_linesep:
             self.output = self.output.replace('\n', os.linesep)
             self.error = self.error.replace('\n', os.linesep)
 
@@ -795,8 +791,6 @@ class IntegrationTests(TestCase):
         """
         If no arguments are passed to C{pyflakes} then it reads from stdin.
         """
-        if PYPY:
-            print(PYPY_VERSION, tuple(PYPY_VERSION))
         d = self.runPyflakes([], stdin='import contraband')
         expected = UnusedImport('<stdin>', Node(1), 'contraband')
         if PYPY and WIN and PYPY_VERSION >= (5, 10):

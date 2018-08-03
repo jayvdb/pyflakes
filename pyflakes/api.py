@@ -16,12 +16,6 @@ __all__ = ['check', 'checkPath', 'checkRecursive', 'iterSourceCode', 'main']
 
 PYTHON_SHEBANG_REGEX = re.compile(br'^#!.*\bpython[23w]?\b\s*$')
 
-try:
-    WindowsError
-    WIN = True
-except NameError:
-    WIN = False
-
 
 def check(codeString, filename, reporter=None):
     """
@@ -62,9 +56,6 @@ def check(codeString, filename, reporter=None):
                         except UnicodeDecodeError:
                             text = None
             offset -= 1
-
-            # if text and checker.PYPY_VERSION > (5, 10) and WIN:
-            #    text = text.replace('\n', os.linesep)
 
         # If there's an encoding problem with the file, the text is None.
         if text is None:
