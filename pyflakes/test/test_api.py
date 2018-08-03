@@ -726,7 +726,7 @@ class IntegrationTests(TestCase):
         When a Python source file is all good, the return code is zero and no
         messages are printed to either stdout or stderr.
         """
-        fd = open(self.tempfilepath, 'w')
+        fd = open(self.tempfilepath, 'a')
         fd.close()
         d = self.runPyflakes([self.tempfilepath])
         self.assertEqual(d, ('', '', 0))
@@ -736,8 +736,8 @@ class IntegrationTests(TestCase):
         When a Python source file has warnings, the return code is non-zero
         and the warnings are printed to stdout.
         """
-        fd = open(self.tempfilepath, 'w')
-        fd.write("import contraband\n")
+        fd = open(self.tempfilepath, 'wb')
+        fd.write("import contraband\n".encode('ascii'))
         fd.close()
         d = self.runPyflakes([self.tempfilepath])
         expected = UnusedImport(self.tempfilepath, Node(1), 'contraband')
@@ -772,8 +772,8 @@ class IntegrationTests(TestCase):
         exist, say), then the return code is non-zero and the errors are
         printed to stderr.
         """
-        fd = open(self.tempfilepath, 'w')
-        fd.write("import")
+        fd = open(self.tempfilepath, 'wb')
+        fd.write("import".encode('ascii'))
         fd.close()
         d = self.runPyflakes([self.tempfilepath])
         if PYPY:
