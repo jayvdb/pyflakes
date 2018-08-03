@@ -726,9 +726,6 @@ class IntegrationTests(TestCase):
         if PYPY and PYPY_VERSION[0:2] >= (6, ):
             if WIN:
                 stderr = stderr.replace('\n', os.linesep)
-            # PyPy 6 returns 1 instead of True
-            elif rv == 1:
-                rv = True
         return (stdout, stderr, rv)
 
     def test_goodFile(self):
@@ -791,7 +788,7 @@ class IntegrationTests(TestCase):
 
         error_msg = '{0}:1:{2}: invalid syntax{1}import{1}    {3}^{1}'.format(
             self.tempfilepath, os.linesep, column, last_line_extra)
-        self.assertEqual(d, ('', error_msg, True))
+        self.assertEqual(d, ('', error_msg, 1))
 
     def test_readFromStdin(self):
         """
