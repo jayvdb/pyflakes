@@ -792,8 +792,8 @@ class IntegrationTests(TestCase):
 
         # Discard linesep on PyPy 5.10+ but not PyPy 6
         if PYPY and WIN and (5, 10) <= PYPY_VERSION < (6, ):
-            d = (d[0], d[1].replace('\r\n', '').replace('\n', ''), d[2])
-            linesep = ''
+            d = (d[0], d[1].replace('\r\n', '\n'), d[2])
+            linesep = '\n'
         else:
             linesep = os.linesep
 
