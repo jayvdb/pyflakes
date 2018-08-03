@@ -1206,6 +1206,30 @@ class TestUnusedAssignment(TestCase):
             b = 1
         ''', m.UnusedVariable)
 
+    def test_del_unusedVariable(self):
+        """
+        Warn when a variable in a function is assigned a value that's never
+        used before it is deleted.
+        """
+        self.flakes('''
+        def a():
+            b = 1
+            del b
+        ''', m.UnusedVariable)
+
+    def test_del_reused_unusedVariable(self):
+        """
+        Warn when a variable in a function is assigned a value that's never
+        used before it is deleted.
+        """
+        self.flakes('''
+        def a():
+            b = 1
+            del b
+            b = 2
+            return b
+        ''', m.UnusedVariable)
+
     def test_unusedUnderscoreVariable(self):
         """
         Don't warn when the magic "_" (underscore) variable is unused.

@@ -412,6 +412,13 @@ class ExportBinding(Binding):
 class Scope(dict):
     importStarred = False       # set to True when import * is found
 
+    def __init__(self):
+        self._deleted_bindings = dict()
+
+    def __delitem__(self, key):
+        self._deleted_bindings[key] = self[key]
+        super(Scope, self).__delitem__(key)
+
     def __repr__(self):
         scope_cls = self.__class__.__name__
         return '<%s at 0x%x %s>' % (scope_cls, id(self), dict.__repr__(self))
@@ -442,7 +449,8 @@ class FunctionScope(Scope):
         """
         Return a generator for the assignments which have not been used.
         """
-        for name, binding in self.items():
+        bindings = dict(self, **self._deleted_bindings)
+        for name, binding in bindings.items():
             if (not binding.used
                     and name != '_'  # see issue #202
                     and name not in self.globals
