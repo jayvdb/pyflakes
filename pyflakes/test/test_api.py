@@ -719,6 +719,9 @@ class IntegrationTests(TestCase):
         # Workaround https://bitbucket.org/pypy/pypy/issues/2350
         if PYPY and PY2 and WIN:
             stderr = stderr.replace('\r\r\n', '\r\n')
+        if PYPY and PYPY_VERSION[0:2] >= (6, ):
+            if WIN:
+                stderr = stderr.replace('\n', os.linesep)
         return (stdout, stderr, rv)
 
     def test_goodFile(self):
