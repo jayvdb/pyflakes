@@ -465,13 +465,12 @@ def foo(
         if PYPY:
             if PYPY_VERSION >= (6, ):
                 column = 6
-                last_line = '\t    ^'
             else:
                 column = 5
-                last_line = '\t   ^'
         else:
             column = 7
-            last_line = '\t     ^'
+
+        last_line = '\t%s^' % (' ' * (column - 2))
 
         self.assertHasErrors(
             sourcePath,
@@ -494,10 +493,9 @@ def foo(bar=baz, bax):
         sourcePath = self.makeTempFile(source)
         last_line = '       ^\n' if ERROR_HAS_LAST_LINE else ''
         column = '8:' if ERROR_HAS_COL_NUM else ''
-        if PYPY:
-            if (5, 10) < PYPY_VERSION and (WIN or PYPY_VERSION < (6, )):
-                column = '7:'
-                last_line = last_line[1:]
+        if PYPY and ((5, 10) < PYPY_VERSION and (WIN or PYPY_VERSION < (6, ))):
+            column = '7:'
+            last_line = last_line[1:]
 
         self.assertHasErrors(
             sourcePath,
@@ -518,10 +516,9 @@ foo(bar=baz, bax)
         sourcePath = self.makeTempFile(source)
         last_line = '            ^\n' if ERROR_HAS_LAST_LINE else ''
         column = '13:' if ERROR_HAS_COL_NUM or PYPY else ''
-        if PYPY:
-            if (5, 10) < PYPY_VERSION and (WIN or PYPY_VERSION < (6, )):
-                column = '12:'
-                last_line = last_line[1:]
+        if PYPY and ((5, 10) < PYPY_VERSION and (WIN or PYPY_VERSION < (6, ))):
+            column = '12:'
+            last_line = last_line[1:]
 
         if sys.version_info >= (3, 5):
             message = 'positional argument follows keyword argument'
@@ -782,13 +779,12 @@ class IntegrationTests(TestCase):
         if PYPY:
             if PYPY_VERSION >= (6, ):
                 column = 6
-                last_line_extra = ' '
             else:
                 column = 5
-                last_line_extra = ''
         else:
             column = 7
-            last_line_extra = '  '
+
+        last_line = '%s^' % (' ' * (column - 1))
 
         # Discard linesep on PyPy 5.10+ but not PyPy 6
         if PYPY and WIN and (5, 10) <= PYPY_VERSION < (6, ):
@@ -797,8 +793,8 @@ class IntegrationTests(TestCase):
         else:
             linesep = os.linesep
 
-        error_msg = '{0}:1:{2}: invalid syntax{1}import{1}    {3}^{1}'.format(
-            self.tempfilepath, linesep, column, last_line_extra)
+        error_msg = '{0}:1:{2}: invalid syntax{1}import{1}{3}{1}'.format(
+            self.tempfilepath, linesep, column, last_line)
         self.assertEqual(d, ('', error_msg, 1))
 
     def test_readFromStdin(self):
