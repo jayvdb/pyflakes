@@ -795,7 +795,7 @@ class IntegrationTests(TestCase):
 
         error_msg = '{0}:1:{2}: invalid syntax{1}import{1}{3}{1}'.format(
             self.tempfilepath, linesep, column, last_line)
-        self.assertEqual(d, ('', error_msg, 1))
+        self.assertEqual(d, ('', error_msg, True))
 
     def test_readFromStdin(self):
         """
@@ -821,7 +821,6 @@ class TestMain(IntegrationTests):
             with SysStreamCapturing(stdin) as capture:
                 main(args=paths)
         except SystemExit as e:
-            rv = int(e.code)
-            return (capture.output, capture.error, rv)
+            return (capture.output, capture.error, e.code)
         else:
             raise RuntimeError('SystemExit not raised')
