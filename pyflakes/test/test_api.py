@@ -758,8 +758,15 @@ class IntegrationTests(TestCase):
         printed to stderr.
         """
         d = self.runPyflakes([self.tempfilepath])
+
+        # Discard linesep on PyPy 5.10+ but not PyPy 6
+        if PYPY and WIN and (5, 10) <= PYPY_VERSION < (6, ):
+            d = (d[0], d[1].rstrip(), d[2])
+            linesep = ''
+        else:
+            linesep = os.linesep
         error_msg = '%s: No such file or directory%s' % (self.tempfilepath,
-                                                         os.linesep)
+                                                         linesep)
         self.assertEqual(d, ('', error_msg, 1))
 
     def test_errors_syntax(self):
@@ -783,8 +790,15 @@ class IntegrationTests(TestCase):
             column = 7
             last_line_extra = '  '
 
+        # Discard linesep on PyPy 5.10+ but not PyPy 6
+        if PYPY and WIN and (5, 10) <= PYPY_VERSION < (6, ):
+            d = (d[0], d[1].replace('\r\n', '').replace('\n', ''), d[2])
+            linesep = ''
+        else:
+            linesep = os.linesep
+
         error_msg = '{0}:1:{2}: invalid syntax{1}import{1}    {3}^{1}'.format(
-            self.tempfilepath, os.linesep, column, last_line_extra)
+            self.tempfilepath, linesep, column, last_line_extra)
         self.assertEqual(d, ('', error_msg, 1))
 
     def test_readFromStdin(self):
